@@ -43,9 +43,9 @@ import {
   addOutline,
   saveOutline,
   trashOutline,
-  editOutline,
+  pencilOutline,
   reorderThreeOutline,
-  duplicateOutline,
+  copyOutline,
   eyeOutline,
   closeOutline,
   checkmarkOutline,
@@ -522,13 +522,13 @@ const CreateExam: React.FC = () => {
                       color="primary"
                       onClick={() => editQuestion(index)}
                     >
-                      <IonIcon icon={editOutline} />
+                      <IonIcon icon={pencilOutline} />
                     </IonItemOption>
                     <IonItemOption
                       color="secondary"
                       onClick={() => duplicateQuestion(index)}
                     >
-                      <IonIcon icon={duplicateOutline} />
+                      <IonIcon icon={copyOutline} />
                     </IonItemOption>
                     <IonItemOption
                       color="danger"

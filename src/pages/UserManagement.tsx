@@ -42,7 +42,7 @@ import {
 import {
   addOutline,
   personOutline,
-  editOutline,
+  pencilOutline,
   trashOutline,
   closeOutline,
   saveOutline,
@@ -54,7 +54,7 @@ import {
   shieldCheckmarkOutline,
   statsChartOutline,
   downloadOutline,
-  filterOutline,
+  funnelOutline,
 } from "ionicons/icons";
 import { User } from "../types/exam";
 import "./UserManagement.css";
@@ -581,7 +581,7 @@ const UserManagement: React.FC = () => {
                         color="primary"
                         onClick={() => editUser(user)}
                       >
-                        <IonIcon icon={editOutline} />
+                        <IonIcon icon={pencilOutline} />
                       </IonItemOption>
                       <IonItemOption
                         color="danger"
