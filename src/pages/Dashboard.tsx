@@ -382,10 +382,7 @@ const Dashboard: React.FC = () => {
                     <div className="exam-item-content">
                       <div className="exam-header">
                         <h3>{exam.title}</h3>
-                        <IonChip
-                          color={getDifficultyColor(exam.difficulty)}
-                          size="small"
-                        >
+                        <IonChip color={getDifficultyColor(exam.difficulty)}>
                           {exam.difficulty}
                         </IonChip>
                       </div>
