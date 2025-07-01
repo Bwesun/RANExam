@@ -96,6 +96,13 @@ const Menu: React.FC = () => {
       role: ["admin"],
     },
     {
+      title: "Admin Dashboard",
+      url: "/admin-dashboard",
+      iosIcon: peopleOutline,
+      mdIcon: peopleSharp,
+      role: ["instructor", "admin"],
+    },
+    {
       title: "Profile",
       url: "/profile",
       iosIcon: personOutline,

@@ -16,6 +16,7 @@ import TakeExam from "./pages/TakeExam";
 import ExamResult from "./pages/ExamResult";
 import CreateExam from "./pages/CreateExam";
 import UserManagement from "./pages/UserManagement";
+import AdminDashboard from "./pages/AdminDashboard";
 
 /* Core CSS required for Ionic components to work properly */
 import "@ionic/react/css/core.css";
@@ -98,6 +99,7 @@ const AppRoutes: React.FC = () => {
             <Route path="/result/:examId" component={ExamResult} exact />
             <Route path="/create-exam" component={CreateExam} exact />
             <Route path="/user-management" component={UserManagement} exact />
+            <Route path="/admin-dashboard" component={AdminDashboard} exact />
             <Route path="/" exact>
               <Redirect to="/dashboard" />
             </Route>
