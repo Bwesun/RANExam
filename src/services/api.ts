@@ -203,6 +203,9 @@ export const authAPI = {
   },
 
   logout: async (): Promise<ApiResponse<any>> => {
+    if (USE_MOCK_API) {
+      return mockAuthAPI.logout();
+    }
     const response: AxiosResponse<ApiResponse<any>> =
       await api.post("/auth/logout");
     return response.data;
