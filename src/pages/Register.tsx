@@ -21,7 +21,7 @@ import {
 } from "@ionic/react";
 import { useHistory } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { schoolOutline } from "ionicons/icons";
+import { schoolOutline, eyeOutline, eyeOffOutline } from "ionicons/icons";
 import "./Login.css";
 
 const Register: React.FC = () => {
@@ -29,9 +29,14 @@ const Register: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [department, setDepartment] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [role, setRole] = useState<"student" | "instructor">("student");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [toastColor, setToastColor] = useState<"danger" | "success">("danger");
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const history = useHistory();
@@ -40,33 +45,70 @@ const Register: React.FC = () => {
     e.preventDefault();
 
     if (!name || !email || !password || !confirmPassword) {
-      setToastMessage("Please fill in all fields");
+      setToastMessage("Please fill in all required fields");
+      setToastColor("danger");
+      setShowToast(true);
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      setToastMessage("Please enter a valid email address");
+      setToastColor("danger");
       setShowToast(true);
       return;
     }
 
     if (password !== confirmPassword) {
       setToastMessage("Passwords do not match");
+      setToastColor("danger");
       setShowToast(true);
       return;
     }
 
     if (password.length < 6) {
       setToastMessage("Password must be at least 6 characters");
+      setToastColor("danger");
+      setShowToast(true);
+      return;
+    }
+
+    if (name.length < 2) {
+      setToastMessage("Name must be at least 2 characters");
+      setToastColor("danger");
       setShowToast(true);
       return;
     }
 
     setLoading(true);
-    const success = await register(email, password, name, role);
+    const result = await register(
+      email,
+      password,
+      name,
+      role,
+      department,
+      phoneNumber,
+    );
     setLoading(false);
 
-    if (success) {
-      history.push("/dashboard");
+    if (result.success) {
+      setToastMessage(
+        "Registration successful! Please check your email for verification.",
+      );
+      setToastColor("success");
+      setShowToast(true);
+      setTimeout(() => {
+        history.push("/dashboard");
+      }, 1500);
     } else {
-      setToastMessage("Registration failed");
+      setToastMessage(result.message || "Registration failed");
+      setToastColor("danger");
       setShowToast(true);
     }
+  };
+
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   return (
