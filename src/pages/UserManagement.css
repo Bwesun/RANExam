@@ -1,0 +1,285 @@
+.user-management-content {
+  --background: var(--ion-color-light);
+}
+
+.user-management-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.summary-card {
+  --background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  height: 100%;
+}
+
+.summary-content {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.summary-icon {
+  font-size: 2.5rem;
+  color: var(--ion-color-primary);
+}
+
+.summary-content h3 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 0;
+  color: var(--ion-color-dark);
+}
+
+.summary-content p {
+  margin: 0;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+}
+
+.filters-section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.filter-segments {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.filter-segments ion-segment {
+  --background: rgba(var(--ion-color-light-rgb), 0.5);
+  border-radius: 8px;
+}
+
+.user-item {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --inner-padding-end: 16px;
+  margin-bottom: 10px;
+  --background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.user-avatar {
+  width: 50px;
+  height: 50px;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ion-color-primary);
+  color: white;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.user-info {
+  width: 100%;
+}
+
+.user-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.user-main h3 {
+  margin: 0;
+  color: var(--ion-color-dark);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.user-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.user-badges ion-chip {
+  height: 24px;
+  font-size: 0.75rem;
+}
+
+.user-badges ion-badge {
+  font-size: 0.7rem;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-details p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-details ion-icon {
+  font-size: 1rem;
+}
+
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.no-users {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--ion-color-medium);
+}
+
+.no-users-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.no-users h3 {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+  color: var(--ion-color-dark);
+}
+
+.user-modal-content {
+  --background: var(--ion-color-light);
+}
+
+.user-form {
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.form-buttons {
+  margin-top: 30px;
+}
+
+.save-user-btn {
+  --border-radius: 25px;
+  height: 50px;
+  font-weight: 600;
+}
+
+.stats-content {
+  padding: 20px;
+}
+
+.stat-card {
+  --background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-item h3 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 0 0 5px 0;
+  color: var(--ion-color-primary);
+}
+
+.stat-item p {
+  margin: 0;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .user-management-container {
+    padding: 15px;
+  }
+
+  .summary-content {
+    gap: 10px;
+  }
+
+  .summary-icon {
+    font-size: 2rem;
+  }
+
+  .summary-content h3 {
+    font-size: 1.5rem;
+  }
+
+  .filter-segments {
+    gap: 10px;
+  }
+
+  .user-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .user-badges {
+    flex-wrap: wrap;
+  }
+
+  .user-form {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-management-container {
+    padding: 10px;
+  }
+
+  .filters-section {
+    gap: 10px;
+  }
+
+  .user-item {
+    --padding-start: 12px;
+    --padding-end: 12px;
+  }
+
+  .user-avatar {
+    width: 40px;
+    height: 40px;
+  }
+
+  .avatar-placeholder {
+    font-size: 1rem;
+  }
+
+  .user-main h3 {
+    font-size: 1rem;
+  }
+
+  .user-details p {
+    font-size: 0.8rem;
+  }
+
+  .user-badges ion-chip {
+    height: 20px;
+    font-size: 0.7rem;
+  }
+
+  .user-actions {
+    flex-direction: column;
+    gap: 5px;
+  }
+}
