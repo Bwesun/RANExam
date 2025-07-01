@@ -71,3 +71,12 @@ ion-content {
   --background: var(--ion-color-light);
   --color: var(--ion-color-dark);
 }
+
+ion-toolbar{
+	--background: var(--ion-color-primary);
+}
+
+ion-input, ion-item, ion-modal{
+	--background: var(--ion-color-light);
+	color: var(--ion-color-dark);
+}
