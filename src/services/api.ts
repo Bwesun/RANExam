@@ -127,6 +127,9 @@ export interface CreateQuestionRequest {
 // Auth API
 export const authAPI = {
   login: async (data: LoginRequest): Promise<ApiResponse<any>> => {
+    if (USE_MOCK_API) {
+      return mockAuthAPI.login(data);
+    }
     const response: AxiosResponse<ApiResponse<any>> = await api.post(
       "/auth/login",
       data,
@@ -135,6 +138,9 @@ export const authAPI = {
   },
 
   register: async (data: RegisterRequest): Promise<ApiResponse<any>> => {
+    if (USE_MOCK_API) {
+      return mockAuthAPI.register(data);
+    }
     const response: AxiosResponse<ApiResponse<any>> = await api.post(
       "/auth/register",
       data,
@@ -143,6 +149,9 @@ export const authAPI = {
   },
 
   getProfile: async (): Promise<ApiResponse<any>> => {
+    if (USE_MOCK_API) {
+      return mockAuthAPI.getProfile();
+    }
     const response: AxiosResponse<ApiResponse<any>> = await api.get("/auth/me");
     return response.data;
   },
