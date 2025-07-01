@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ranexam</string>
+    <string name="title_activity_main">ranexam</string>
+    <string name="package_name">ionic.ranexam</string>
+    <string name="custom_url_scheme">ionic.ranexam</string>
+</resources>
