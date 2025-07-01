@@ -486,6 +486,9 @@ export const usersAPI = {
 // Admin API
 export const adminAPI = {
   getDashboardStats: async (): Promise<ApiResponse<any>> => {
+    if (USE_MOCK_API) {
+      return mockAdminAPI.getDashboardStats();
+    }
     const response: AxiosResponse<ApiResponse<any>> =
       await api.get("/admin/dashboard");
     return response.data;
