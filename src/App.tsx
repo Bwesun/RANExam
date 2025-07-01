@@ -11,6 +11,7 @@ import Menu from "./components/Menu";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import ExamList from "./pages/ExamList";
 import TakeExam from "./pages/TakeExam";
 import ExamResult from "./pages/ExamResult";
 
@@ -90,6 +91,7 @@ const AppRoutes: React.FC = () => {
           <Menu />
           <IonRouterOutlet id="main">
             <Route path="/dashboard" component={Dashboard} exact />
+            <Route path="/exams" component={ExamList} exact />
             <Route path="/exam/:examId" component={TakeExam} exact />
             <Route path="/result/:examId" component={ExamResult} exact />
             <Route path="/" exact>
