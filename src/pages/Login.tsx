@@ -166,7 +166,7 @@ const Login: React.FC = () => {
           onDidDismiss={() => setShowToast(false)}
           message={toastMessage}
           duration={3000}
-          color="danger"
+          color={toastColor}
         />
       </IonContent>
     </IonPage>
