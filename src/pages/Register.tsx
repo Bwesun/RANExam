@@ -133,29 +133,31 @@ const Register: React.FC = () => {
             <IonCardContent>
               <form onSubmit={handleRegister}>
                 <IonItem>
-                  <IonLabel position="stacked">Full Name</IonLabel>
+                  <IonLabel position="stacked">Full Name *</IonLabel>
                   <IonInput
                     type="text"
                     value={name}
                     onIonInput={(e) => setName(e.detail.value!)}
                     placeholder="Enter your full name"
                     required
+                    clearInput
                   />
                 </IonItem>
 
                 <IonItem>
-                  <IonLabel position="stacked">Email</IonLabel>
+                  <IonLabel position="stacked">Email *</IonLabel>
                   <IonInput
                     type="email"
                     value={email}
                     onIonInput={(e) => setEmail(e.detail.value!)}
                     placeholder="Enter your email"
                     required
+                    clearInput
                   />
                 </IonItem>
 
                 <IonItem>
-                  <IonLabel position="stacked">Role</IonLabel>
+                  <IonLabel position="stacked">Role *</IonLabel>
                   <IonSelect
                     value={role}
                     onIonChange={(e) => setRole(e.detail.value)}
@@ -169,25 +171,63 @@ const Register: React.FC = () => {
                 </IonItem>
 
                 <IonItem>
-                  <IonLabel position="stacked">Password</IonLabel>
+                  <IonLabel position="stacked">Department</IonLabel>
                   <IonInput
-                    type="password"
+                    type="text"
+                    value={department}
+                    onIonInput={(e) => setDepartment(e.detail.value!)}
+                    placeholder="Enter your department (optional)"
+                    clearInput
+                  />
+                </IonItem>
+
+                <IonItem>
+                  <IonLabel position="stacked">Phone Number</IonLabel>
+                  <IonInput
+                    type="tel"
+                    value={phoneNumber}
+                    onIonInput={(e) => setPhoneNumber(e.detail.value!)}
+                    placeholder="Enter your phone number (optional)"
+                    clearInput
+                  />
+                </IonItem>
+
+                <IonItem>
+                  <IonLabel position="stacked">Password *</IonLabel>
+                  <IonInput
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onIonInput={(e) => setPassword(e.detail.value!)}
                     placeholder="Enter your password"
                     required
                   />
+                  <IonButton
+                    fill="clear"
+                    slot="end"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    <IonIcon icon={showPassword ? eyeOffOutline : eyeOutline} />
+                  </IonButton>
                 </IonItem>
 
                 <IonItem>
-                  <IonLabel position="stacked">Confirm Password</IonLabel>
+                  <IonLabel position="stacked">Confirm Password *</IonLabel>
                   <IonInput
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onIonInput={(e) => setConfirmPassword(e.detail.value!)}
                     placeholder="Confirm your password"
                     required
                   />
+                  <IonButton
+                    fill="clear"
+                    slot="end"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    <IonIcon
+                      icon={showConfirmPassword ? eyeOffOutline : eyeOutline}
+                    />
+                  </IonButton>
                 </IonItem>
 
                 <IonButton
