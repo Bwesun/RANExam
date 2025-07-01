@@ -1,0 +1,230 @@
+.exam-content {
+  --background: var(--ion-color-light);
+}
+
+.exam-container {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.timer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  margin-right: 10px;
+}
+
+.timer.warning {
+  background: var(--ion-color-danger);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.exam-progress {
+  margin-bottom: 20px;
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  color: var(--ion-color-medium);
+}
+
+.question-card {
+  --background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.question-header h2 {
+  margin: 0;
+  color: var(--ion-color-primary);
+  font-size: 1.3rem;
+}
+
+.difficulty {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.difficulty.easy {
+  background: var(--ion-color-success);
+  color: white;
+}
+
+.difficulty.medium {
+  background: var(--ion-color-warning);
+  color: black;
+}
+
+.difficulty.hard {
+  background: var(--ion-color-danger);
+  color: white;
+}
+
+.question-text {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-bottom: 25px;
+  color: var(--ion-color-dark);
+  font-weight: 500;
+}
+
+.option-item {
+  --background: rgba(var(--ion-color-primary-rgb), 0.05);
+  --border-radius: 8px;
+  margin-bottom: 12px;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --inner-padding-end: 16px;
+}
+
+.option-item:hover {
+  --background: rgba(var(--ion-color-primary-rgb), 0.1);
+}
+
+.option-label {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.navigation-buttons {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.nav-spacer {
+  flex: 1;
+}
+
+.answer-grid {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.answer-grid h3 {
+  margin: 0 0 15px 0;
+  color: var(--ion-color-dark);
+  font-size: 1.1rem;
+}
+
+.answer-circles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 10px;
+}
+
+.answer-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--ion-color-medium);
+  background: transparent;
+  color: var(--ion-color-medium);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.answer-circle:hover {
+  border-color: var(--ion-color-primary);
+  color: var(--ion-color-primary);
+}
+
+.answer-circle.current {
+  border-color: var(--ion-color-primary);
+  background: var(--ion-color-primary);
+  color: white;
+}
+
+.answer-circle.answered {
+  border-color: var(--ion-color-success);
+  background: var(--ion-color-success);
+  color: white;
+}
+
+.answer-circle.answered.current {
+  border-color: var(--ion-color-primary);
+  background: var(--ion-color-primary);
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.2rem;
+  color: var(--ion-color-medium);
+}
+
+@media (max-width: 768px) {
+  .exam-container {
+    padding: 15px;
+  }
+
+  .question-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .navigation-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .nav-spacer {
+    display: none;
+  }
+
+  .answer-circles {
+    grid-template-columns: repeat(auto-fill, minmax(35px, 1fr));
+    gap: 8px;
+  }
+
+  .answer-circle {
+    width: 35px;
+    height: 35px;
+    font-size: 0.8rem;
+  }
+}
