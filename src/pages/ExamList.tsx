@@ -20,118 +20,191 @@ import {
   IonSearchbar,
   IonSegment,
   IonSegmentButton,
+  IonSpinner,
+  IonRefresher,
+  IonRefresherContent,
+  IonToast,
+  IonChip,
+  IonText,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonSelect,
+  IonSelectOption,
 } from "@ionic/react";
 import {
   timeOutline,
   documentTextOutline,
   checkmarkCircleOutline,
+  playOutline,
+  filterOutline,
+  schoolOutline,
 } from "ionicons/icons";
-import { Exam } from "../types/exam";
+import { useHistory } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { examsAPI } from "../services/api";
 import "./ExamList.css";
 
+interface ExamData {
+  _id: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: string;
+  timeLimit: number;
+  passingScore: number;
+  totalQuestions: number;
+  isActive: boolean;
+  createdAt: string;
+  createdBy?: {
+    name: string;
+  };
+}
+
 const ExamList: React.FC = () => {
-  const [exams, setExams] = useState<Exam[]>([]);
+  const { user } = useAuth();
+  const history = useHistory();
+  const [exams, setExams] = useState<ExamData[]>([]);
+  const [filteredExams, setFilteredExams] = useState<ExamData[]>([]);
   const [searchText, setSearchText] = useState("");
-  const [filter, setFilter] = useState<"all" | "available" | "completed">(
-    "all",
-  );
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string>("all");
+  const [loading, setLoading] = useState(true);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    // Mock exam data
-    const mockExams: Exam[] = [
-      {
-        id: "1",
-        title: "JavaScript Fundamentals",
-        description:
-          "Test your knowledge of JavaScript basics including variables, functions, and data types",
-        duration: 30,
-        questions: [],
-        totalMarks: 100,
-        passingMarks: 60,
-        isActive: true,
-        createdBy: "instructor1",
-        createdAt: new Date(),
-        category: "Programming",
-      },
-      {
-        id: "2",
-        title: "React Advanced Concepts",
-        description:
-          "Advanced React concepts including hooks, context, and performance optimization",
-        duration: 45,
-        questions: [],
-        totalMarks: 150,
-        passingMarks: 90,
-        isActive: true,
-        createdBy: "instructor1",
-        createdAt: new Date(),
-        category: "Frontend",
-      },
-      {
-        id: "3",
-        title: "Database Design Principles",
-        description:
-          "SQL fundamentals, database normalization, and design patterns",
-        duration: 60,
-        questions: [],
-        totalMarks: 200,
-        passingMarks: 120,
-        isActive: true,
-        createdBy: "instructor2",
-        createdAt: new Date(),
-        category: "Database",
-      },
-      {
-        id: "4",
-        title: "Web Security Basics",
-        description:
-          "Understanding common web vulnerabilities and security best practices",
-        duration: 40,
-        questions: [],
-        totalMarks: 120,
-        passingMarks: 72,
-        isActive: true,
-        createdBy: "instructor3",
-        createdAt: new Date(),
-        category: "Security",
-      },
-    ];
-
-    setExams(mockExams);
+    loadExams();
   }, []);
 
-  const filteredExams = exams.filter((exam) => {
-    const matchesSearch =
-      exam.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      exam.description.toLowerCase().includes(searchText.toLowerCase()) ||
-      exam.category.toLowerCase().includes(searchText.toLowerCase());
+  useEffect(() => {
+    filterExams();
+  }, [exams, searchText, selectedCategory, selectedDifficulty]);
 
-    switch (filter) {
-      case "available":
-        return matchesSearch && exam.isActive;
-      case "completed":
-        // Mock: check if exam is completed (you would check against user's attempt history)
-        return matchesSearch && false; // For demo, no exams are completed
-      default:
-        return matchesSearch;
+  const loadExams = async () => {
+    setLoading(true);
+    try {
+      const response = await examsAPI.getExams({
+        page: 1,
+        limit: 100,
+        isActive: true,
+      });
+
+      if (response.success && response.data) {
+        const examData = response.data.exams || [];
+        setExams(examData);
+
+        // Extract unique categories
+        const uniqueCategories = [
+          ...new Set(examData.map((exam: ExamData) => exam.category)),
+        ].filter(Boolean) as string[];
+        setCategories(uniqueCategories);
+      } else {
+        setToastMessage("Failed to load exams");
+        setShowToast(true);
+      }
+    } catch (error) {
+      console.error("Failed to load exams:", error);
+      setToastMessage("Failed to load exams");
+      setShowToast(true);
+    } finally {
+      setLoading(false);
     }
-  });
-
-  const formatDuration = (minutes: number) => {
-    return `${minutes} min${minutes > 1 ? "s" : ""}`;
   };
 
-  const getDifficultyColor = (totalMarks: number) => {
-    if (totalMarks <= 100) return "success";
-    if (totalMarks <= 150) return "warning";
-    return "danger";
+  const filterExams = () => {
+    let filtered = [...exams];
+
+    // Filter by search text
+    if (searchText.trim()) {
+      const searchLower = searchText.toLowerCase();
+      filtered = filtered.filter(
+        (exam) =>
+          exam.title.toLowerCase().includes(searchLower) ||
+          exam.description.toLowerCase().includes(searchLower) ||
+          exam.category.toLowerCase().includes(searchLower),
+      );
+    }
+
+    // Filter by category
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter((exam) => exam.category === selectedCategory);
+    }
+
+    // Filter by difficulty
+    if (selectedDifficulty !== "all") {
+      filtered = filtered.filter(
+        (exam) => exam.difficulty === selectedDifficulty,
+      );
+    }
+
+    setFilteredExams(filtered);
   };
 
-  const getDifficultyText = (totalMarks: number) => {
-    if (totalMarks <= 100) return "Easy";
-    if (totalMarks <= 150) return "Medium";
-    return "Hard";
+  const handleRefresh = async (event: CustomEvent) => {
+    await loadExams();
+    event.detail.complete();
   };
+
+  const handleTakeExam = (examId: string) => {
+    history.push(`/exam/${examId}`);
+  };
+
+  const formatDuration = (minutes: number): string => {
+    if (minutes < 60) {
+      return `${minutes} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0
+      ? `${hours}h ${remainingMinutes}m`
+      : `${hours}h`;
+  };
+
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const getDifficultyColor = (difficulty: string): string => {
+    switch (difficulty.toLowerCase()) {
+      case "beginner":
+        return "success";
+      case "intermediate":
+        return "warning";
+      case "advanced":
+        return "danger";
+      case "expert":
+        return "dark";
+      default:
+        return "medium";
+    }
+  };
+
+  if (loading) {
+    return (
+      <IonPage>
+        <IonHeader>
+          <IonToolbar>
+            <IonButtons slot="start">
+              <IonMenuButton />
+            </IonButtons>
+            <IonTitle>Available Exams</IonTitle>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent>
+          <div className="loading-container">
+            <IonSpinner name="crescent" />
+            <IonText>Loading exams...</IonText>
+          </div>
+        </IonContent>
+      </IonPage>
+    );
+  }
 
   return (
     <IonPage>
@@ -145,40 +218,97 @@ const ExamList: React.FC = () => {
       </IonHeader>
 
       <IonContent fullscreen className="exam-list-content">
-        <div className="exam-list-container">
-          <div className="search-section">
-            <IonSearchbar
-              value={searchText}
-              debounce={300}
-              onIonInput={(e) => setSearchText(e.detail.value!)}
-              placeholder="Search exams..."
-            />
+        <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
+          <IonRefresherContent />
+        </IonRefresher>
 
-            <IonSegment
-              value={filter}
-              onIonChange={(e) => setFilter(e.detail.value as any)}
-            >
-              <IonSegmentButton value="all">
-                <IonLabel>All</IonLabel>
-              </IonSegmentButton>
-              <IonSegmentButton value="available">
-                <IonLabel>Available</IonLabel>
-              </IonSegmentButton>
-              <IonSegmentButton value="completed">
-                <IonLabel>Completed</IonLabel>
-              </IonSegmentButton>
-            </IonSegment>
+        {/* Search and Filters */}
+        <div className="search-filter-section">
+          <IonSearchbar
+            value={searchText}
+            onIonInput={(e) => setSearchText(e.detail.value!)}
+            placeholder="Search exams..."
+            debounce={300}
+          />
+
+          <IonGrid className="filter-grid">
+            <IonRow>
+              <IonCol size="6">
+                <IonItem>
+                  <IonLabel>Category</IonLabel>
+                  <IonSelect
+                    value={selectedCategory}
+                    onIonChange={(e) => setSelectedCategory(e.detail.value)}
+                    interface="popover"
+                  >
+                    <IonSelectOption value="all">
+                      All Categories
+                    </IonSelectOption>
+                    {categories.map((category) => (
+                      <IonSelectOption key={category} value={category}>
+                        {category}
+                      </IonSelectOption>
+                    ))}
+                  </IonSelect>
+                </IonItem>
+              </IonCol>
+
+              <IonCol size="6">
+                <IonItem>
+                  <IonLabel>Difficulty</IonLabel>
+                  <IonSelect
+                    value={selectedDifficulty}
+                    onIonChange={(e) => setSelectedDifficulty(e.detail.value)}
+                    interface="popover"
+                  >
+                    <IonSelectOption value="all">All Levels</IonSelectOption>
+                    <IonSelectOption value="beginner">Beginner</IonSelectOption>
+                    <IonSelectOption value="intermediate">
+                      Intermediate
+                    </IonSelectOption>
+                    <IonSelectOption value="advanced">Advanced</IonSelectOption>
+                    <IonSelectOption value="expert">Expert</IonSelectOption>
+                  </IonSelect>
+                </IonItem>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
+        </div>
+
+        {/* Results Count */}
+        <div className="results-info">
+          <IonText color="medium">
+            Showing {filteredExams.length} of {exams.length} exams
+          </IonText>
+        </div>
+
+        {/* Exam List */}
+        {filteredExams.length === 0 ? (
+          <div className="empty-state">
+            <IonIcon icon={schoolOutline} />
+            <h3>No exams found</h3>
+            <p>
+              {searchText ||
+              selectedCategory !== "all" ||
+              selectedDifficulty !== "all"
+                ? "Try adjusting your search or filters"
+                : "No exams are currently available"}
+            </p>
           </div>
-
-          <div className="exams-grid">
+        ) : (
+          <div className="exam-cards-container">
             {filteredExams.map((exam) => (
-              <IonCard key={exam.id} className="exam-card">
+              <IonCard key={exam._id} className="exam-card">
                 <IonCardHeader>
                   <div className="exam-card-header">
-                    <IonCardTitle>{exam.title}</IonCardTitle>
-                    <IonBadge color={getDifficultyColor(exam.totalMarks)}>
-                      {getDifficultyText(exam.totalMarks)}
-                    </IonBadge>
+                    <IonCardTitle className="exam-title">
+                      {exam.title}
+                    </IonCardTitle>
+                    <div className="exam-badges">
+                      <IonChip color={getDifficultyColor(exam.difficulty)}>
+                        {exam.difficulty}
+                      </IonChip>
+                    </div>
                   </div>
                 </IonCardHeader>
 
@@ -187,25 +317,42 @@ const ExamList: React.FC = () => {
 
                   <div className="exam-details">
                     <div className="detail-item">
-                      <IonIcon icon={timeOutline} />
-                      <span>{formatDuration(exam.duration)}</span>
-                    </div>
-                    <div className="detail-item">
                       <IonIcon icon={documentTextOutline} />
-                      <span>{exam.totalMarks} marks</span>
+                      <span>{exam.category}</span>
                     </div>
+
                     <div className="detail-item">
-                      <IonBadge color="primary">{exam.category}</IonBadge>
+                      <IonIcon icon={timeOutline} />
+                      <span>{formatDuration(exam.timeLimit)}</span>
                     </div>
+
+                    <div className="detail-item">
+                      <IonIcon icon={checkmarkCircleOutline} />
+                      <span>{exam.totalQuestions} questions</span>
+                    </div>
+                  </div>
+
+                  <div className="exam-meta">
+                    <span className="passing-score">
+                      Passing Score: {exam.passingScore}%
+                    </span>
+                    <span className="created-date">
+                      Created: {formatDate(exam.createdAt)}
+                    </span>
+                    {exam.createdBy && (
+                      <span className="instructor">
+                        by {exam.createdBy.name}
+                      </span>
+                    )}
                   </div>
 
                   <div className="exam-actions">
                     <IonButton
                       expand="block"
-                      routerLink={`/exam/${exam.id}`}
-                      className="start-exam-btn"
+                      onClick={() => handleTakeExam(exam._id)}
+                      className="take-exam-button"
                     >
-                      <IonIcon icon={checkmarkCircleOutline} slot="start" />
+                      <IonIcon icon={playOutline} slot="start" />
                       Start Exam
                     </IonButton>
                   </div>
@@ -213,15 +360,15 @@ const ExamList: React.FC = () => {
               </IonCard>
             ))}
           </div>
+        )}
 
-          {filteredExams.length === 0 && (
-            <div className="no-exams">
-              <IonIcon icon={documentTextOutline} className="no-exams-icon" />
-              <h3>No exams found</h3>
-              <p>There are no exams matching your current filter.</p>
-            </div>
-          )}
-        </div>
+        <IonToast
+          isOpen={showToast}
+          onDidDismiss={() => setShowToast(false)}
+          message={toastMessage}
+          duration={3000}
+          color="danger"
+        />
       </IonContent>
     </IonPage>
   );

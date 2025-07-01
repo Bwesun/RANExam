@@ -8,12 +8,17 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  margin: 0 auto;
 }
 
 .login-container {
   width: 100%;
   max-width: 400px;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .login-header {

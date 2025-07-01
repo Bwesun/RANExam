@@ -16,17 +16,21 @@ import {
   IonToast,
   IonText,
   IonIcon,
+  IonCheckbox,
 } from "@ionic/react";
 import { useHistory } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { schoolOutline } from "ionicons/icons";
+import { schoolOutline, eyeOutline, eyeOffOutline } from "ionicons/icons";
 import "./Login.css";
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [toastColor, setToastColor] = useState<"danger" | "success">("danger");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const history = useHistory();
@@ -36,20 +40,39 @@ const Login: React.FC = () => {
 
     if (!email || !password) {
       setToastMessage("Please fill in all fields");
+      setToastColor("danger");
+      setShowToast(true);
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      setToastMessage("Please enter a valid email address");
+      setToastColor("danger");
       setShowToast(true);
       return;
     }
 
     setLoading(true);
-    const success = await login(email, password);
+    const result = await login(email, password, rememberMe);
     setLoading(false);
 
-    if (success) {
-      history.push("/dashboard");
+    if (result.success) {
+      setToastMessage("Login successful!");
+      setToastColor("success");
+      setShowToast(true);
+      setTimeout(() => {
+        history.push("/dashboard");
+      }, 500);
     } else {
-      setToastMessage("Invalid credentials");
+      setToastMessage(result.message || "Login failed");
+      setToastColor("danger");
       setShowToast(true);
     }
+  };
+
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   return (
@@ -81,18 +104,34 @@ const Login: React.FC = () => {
                     onIonInput={(e) => setEmail(e.detail.value!)}
                     placeholder="Enter your email"
                     required
+                    clearInput
                   />
                 </IonItem>
 
                 <IonItem>
                   <IonLabel position="stacked">Password</IonLabel>
                   <IonInput
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onIonInput={(e) => setPassword(e.detail.value!)}
                     placeholder="Enter your password"
                     required
                   />
+                  <IonButton
+                    fill="clear"
+                    slot="end"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    <IonIcon icon={showPassword ? eyeOffOutline : eyeOutline} />
+                  </IonButton>
+                </IonItem>
+
+                <IonItem lines="none">
+                  <IonCheckbox
+                    checked={rememberMe}
+                    onIonChange={(e) => setRememberMe(e.detail.checked)}
+                  />
+                  <IonLabel className="ion-margin-start">Remember me</IonLabel>
                 </IonItem>
 
                 <IonButton
@@ -113,9 +152,12 @@ const Login: React.FC = () => {
 
               <div className="demo-accounts">
                 <IonText color="medium">
-                  <p>Demo Accounts:</p>
-                  <p>Student: student@test.com / password</p>
-                  <p>Instructor: instructor@test.com / password</p>
+                  <p>
+                    Demo Accounts (all use password: <strong>password</strong>):
+                  </p>
+                  <p>👨‍🎓 Student: student@test.com</p>
+                  <p>👨‍🏫 Instructor: instructor@test.com</p>
+                  <p>👨‍💼 Admin: admin@ranexam.com</p>
                 </IonText>
               </div>
             </IonCardContent>
@@ -127,7 +169,7 @@ const Login: React.FC = () => {
           onDidDismiss={() => setShowToast(false)}
           message={toastMessage}
           duration={3000}
-          color="danger"
+          color={toastColor}
         />
       </IonContent>
     </IonPage>
