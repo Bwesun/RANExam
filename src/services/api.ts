@@ -1,4 +1,11 @@
 import axios, { AxiosResponse } from "axios";
+import {
+  USE_MOCK_API,
+  mockAuthAPI,
+  mockExamsAPI,
+  mockResultsAPI,
+  mockAdminAPI,
+} from "./mockApi";
 
 // Create axios instance with base configuration
 const api = axios.create({
