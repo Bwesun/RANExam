@@ -152,9 +152,12 @@ const Login: React.FC = () => {
 
               <div className="demo-accounts">
                 <IonText color="medium">
-                  <p>Demo Accounts:</p>
-                  <p>Student: student@test.com / password</p>
-                  <p>Instructor: instructor@test.com / password</p>
+                  <p>
+                    Demo Accounts (all use password: <strong>password</strong>):
+                  </p>
+                  <p>👨‍🎓 Student: student@test.com</p>
+                  <p>👨‍🏫 Instructor: instructor@test.com</p>
+                  <p>👨‍💼 Admin: admin@ranexam.com</p>
                 </IonText>
               </div>
             </IonCardContent>
