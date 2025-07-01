@@ -1,0 +1,185 @@
+.dashboard-content {
+  --background: var(--ion-color-light);
+}
+
+.dashboard-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.welcome-section {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+}
+
+.welcome-section h1 {
+  color: var(--ion-color-primary);
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.welcome-section p {
+  color: var(--ion-color-medium);
+  font-size: 1.1rem;
+}
+
+.stat-card {
+  height: 100%;
+  --background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.stat-icon {
+  font-size: 2.5rem;
+  color: var(--ion-color-primary);
+}
+
+.stat-content h3 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 0;
+  color: var(--ion-color-dark);
+}
+
+.stat-content p {
+  margin: 0;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+}
+
+.exam-item,
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 0;
+}
+
+.exam-info,
+.result-info {
+  flex: 1;
+}
+
+.exam-info h3,
+.result-info h3 {
+  margin: 0 0 5px 0;
+  color: var(--ion-color-dark);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.exam-info p,
+.result-info p {
+  margin: 0 0 10px 0;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+}
+
+.exam-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.exam-duration,
+.exam-marks {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+}
+
+.exam-arrow {
+  color: var(--ion-color-primary);
+  font-size: 1.5rem;
+}
+
+.result-score {
+  display: flex;
+  align-items: center;
+}
+
+.score-number {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--ion-color-primary);
+}
+
+.result-status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.result-status.passed {
+  background: var(--ion-color-success);
+  color: white;
+}
+
+.result-status.failed {
+  background: var(--ion-color-danger);
+  color: white;
+}
+
+.action-buttons {
+  margin: 20px 0;
+}
+
+.create-exam-btn {
+  --border-radius: 25px;
+  height: 50px;
+  font-weight: 600;
+}
+
+ion-card {
+  --background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+ion-card-header {
+  padding-bottom: 0;
+}
+
+ion-card-title {
+  color: var(--ion-color-dark);
+  font-weight: 600;
+  font-size: 1.3rem;
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 15px;
+  }
+
+  .welcome-section h1 {
+    font-size: 1.5rem;
+  }
+
+  .stat-content {
+    gap: 10px;
+  }
+
+  .stat-icon {
+    font-size: 2rem;
+  }
+
+  .exam-meta {
+    gap: 8px;
+  }
+}
