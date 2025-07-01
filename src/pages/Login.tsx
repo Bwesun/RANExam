@@ -104,18 +104,34 @@ const Login: React.FC = () => {
                     onIonInput={(e) => setEmail(e.detail.value!)}
                     placeholder="Enter your email"
                     required
+                    clearInput
                   />
                 </IonItem>
 
                 <IonItem>
                   <IonLabel position="stacked">Password</IonLabel>
                   <IonInput
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onIonInput={(e) => setPassword(e.detail.value!)}
                     placeholder="Enter your password"
                     required
                   />
+                  <IonButton
+                    fill="clear"
+                    slot="end"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    <IonIcon icon={showPassword ? eyeOffOutline : eyeOutline} />
+                  </IonButton>
+                </IonItem>
+
+                <IonItem lines="none">
+                  <IonCheckbox
+                    checked={rememberMe}
+                    onIonChange={(e) => setRememberMe(e.detail.checked)}
+                  />
+                  <IonLabel className="ion-margin-start">Remember me</IonLabel>
                 </IonItem>
 
                 <IonButton
