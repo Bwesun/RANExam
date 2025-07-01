@@ -305,10 +305,7 @@ const ExamList: React.FC = () => {
                       {exam.title}
                     </IonCardTitle>
                     <div className="exam-badges">
-                      <IonChip
-                        color={getDifficultyColor(exam.difficulty)}
-                        size="small"
-                      >
+                      <IonChip color={getDifficultyColor(exam.difficulty)}>
                         {exam.difficulty}
                       </IonChip>
                     </div>
