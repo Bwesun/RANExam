@@ -98,7 +98,7 @@ const ExamList: React.FC = () => {
         // Extract unique categories
         const uniqueCategories = [
           ...new Set(examData.map((exam: ExamData) => exam.category)),
-        ];
+        ].filter(Boolean) as string[];
         setCategories(uniqueCategories);
       } else {
         setToastMessage("Failed to load exams");
