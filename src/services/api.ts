@@ -127,9 +127,9 @@ export interface CreateQuestionRequest {
 // Auth API
 export const authAPI = {
   login: async (data: LoginRequest): Promise<ApiResponse<any>> => {
-    if (USE_MOCK_API) {
-      return mockAuthAPI.login(data);
-    }
+    // if (USE_MOCK_API) {
+    //   return mockAuthAPI.login(data);
+    // }
     const response: AxiosResponse<ApiResponse<any>> = await api.post(
       "/auth/login",
       data,
@@ -138,9 +138,9 @@ export const authAPI = {
   },
 
   register: async (data: RegisterRequest): Promise<ApiResponse<any>> => {
-    if (USE_MOCK_API) {
-      return mockAuthAPI.register(data);
-    }
+    // if (USE_MOCK_API) {
+    //   return mockAuthAPI.register(data);
+    // }
     const response: AxiosResponse<ApiResponse<any>> = await api.post(
       "/auth/register",
       data,
@@ -149,9 +149,9 @@ export const authAPI = {
   },
 
   getProfile: async (): Promise<ApiResponse<any>> => {
-    if (USE_MOCK_API) {
-      return mockAuthAPI.getProfile();
-    }
+    // if (USE_MOCK_API) {
+    //   return mockAuthAPI.getProfile();
+    // }
     const response: AxiosResponse<ApiResponse<any>> = await api.get("/auth/me");
     return response.data;
   },
@@ -203,9 +203,9 @@ export const authAPI = {
   },
 
   logout: async (): Promise<ApiResponse<any>> => {
-    if (USE_MOCK_API) {
-      return mockAuthAPI.logout();
-    }
+    // if (USE_MOCK_API) {
+    //   return mockAuthAPI.logout();
+    // }
     const response: AxiosResponse<ApiResponse<any>> =
       await api.post("/auth/logout");
     return response.data;
@@ -223,9 +223,9 @@ export const examsAPI = {
     status?: string;
     isActive?: boolean;
   }): Promise<ApiResponse<any>> => {
-    if (USE_MOCK_API) {
-      return mockExamsAPI.getExams(params);
-    }
+    // if (USE_MOCK_API) {
+    //   return mockExamsAPI.getExams(params);
+    // }
     const response: AxiosResponse<ApiResponse<any>> = await api.get("/exams", {
       params,
     });
@@ -233,9 +233,9 @@ export const examsAPI = {
   },
 
   getExam: async (examId: string): Promise<ApiResponse<any>> => {
-    if (USE_MOCK_API) {
-      return mockExamsAPI.getExam(examId);
-    }
+    // if (USE_MOCK_API) {
+    //   return mockExamsAPI.getExam(examId);
+    // }
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
       `/exams/${examId}`,
     );
@@ -404,10 +404,10 @@ export const attemptsAPI = {
 // Results API
 export const resultsAPI = {
   getResult: async (resultId: string): Promise<ApiResponse<any>> => {
-    if (USE_MOCK_API) {
-      // Mock implementation for getting a single result
-      return { success: true, data: null };
-    }
+    // if (USE_MOCK_API) {
+    //   // Mock implementation for getting a single result
+    //   return { success: true, data: null };
+    // }
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
       `/results/${resultId}`,
     );
@@ -419,9 +419,9 @@ export const resultsAPI = {
     limit?: number;
     examId?: string;
   }): Promise<ApiResponse<any>> => {
-    if (USE_MOCK_API) {
-      return mockResultsAPI.getUserResults(params);
-    }
+    // if (USE_MOCK_API) {
+    //   return mockResultsAPI.getUserResults(params);
+    // }
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
       "/results",
       { params },
@@ -486,9 +486,9 @@ export const usersAPI = {
 // Admin API
 export const adminAPI = {
   getDashboardStats: async (): Promise<ApiResponse<any>> => {
-    if (USE_MOCK_API) {
-      return mockAdminAPI.getDashboardStats();
-    }
+    // if (USE_MOCK_API) {
+    //   return mockAdminAPI.getDashboardStats();
+    // }
     const response: AxiosResponse<ApiResponse<any>> =
       await api.get("/admin/dashboard");
     return response.data;

@@ -42,7 +42,7 @@ const Login: React.FC = () => {
       setToastMessage("Please fill in all fields");
       setToastColor("danger");
       setShowToast(true);
-      return;
+      return; 
     }
 
     if (!isValidEmail(email)) {

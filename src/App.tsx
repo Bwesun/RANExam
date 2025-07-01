@@ -1,6 +1,7 @@
 import {
   IonApp,
   IonRouterOutlet,
+  IonSpinner,
   IonSplitPane,
   setupIonicReact,
 } from "@ionic/react";
@@ -47,11 +48,27 @@ import "@ionic/react/css/palettes/dark.system.css";
 
 /* Theme variables */
 import "./theme/variables.css";
+import { StatusBar, Style } from "@capacitor/status-bar";
+import { useEffect } from "react";
 
 setupIonicReact();
 
 const AppRoutes: React.FC = () => {
   const { isAuthenticated, loading } = useAuth();
+
+  useEffect(() => {
+    const setStatusBar = async () => {
+      try {
+        await StatusBar.setBackgroundColor({ color: 'var(--ion-color-primary)' }); // Your color here
+        await StatusBar.setOverlaysWebView({ overlay: false }); // Avoid overlapping
+        await StatusBar.setStyle({style: Style.Default})
+      } catch (error) {
+        console.error('Error setting status bar:', error);
+      }
+    };
+
+    setStatusBar();
+  }, []);
 
   if (loading) {
     return (
@@ -64,6 +81,7 @@ const AppRoutes: React.FC = () => {
             height: "100vh",
           }}
         >
+          <IonSpinner name="crescent" color="primary" />
           Loading...
         </div>
       </IonApp>
@@ -85,6 +103,20 @@ const AppRoutes: React.FC = () => {
         </IonReactRouter>
       </IonApp>
     );
+    
+    useEffect(() => {
+    const setStatusBar = async () => {
+      try {
+        await StatusBar.setBackgroundColor({ color: '#2563eb' }); // Your color here
+        await StatusBar.setOverlaysWebView({ overlay: false }); // Avoid overlapping
+        await StatusBar.setStyle({style: Style.Default})
+      } catch (error) {
+        console.error('Error setting status bar:', error);
+      }
+    };
+
+    setStatusBar();
+  }, []);
   }
 
   return (
