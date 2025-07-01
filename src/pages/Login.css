@@ -1,0 +1,87 @@
+.login-content {
+  --background: linear-gradient(
+    135deg,
+    var(--ion-color-primary) 0%,
+    var(--ion-color-secondary) 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 400px;
+  padding: 20px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+  color: white;
+}
+
+.login-icon {
+  font-size: 4rem;
+  margin-bottom: 10px;
+}
+
+.login-header h1 {
+  font-size: 2.5rem;
+  margin: 10px 0;
+  font-weight: bold;
+}
+
+.login-header p {
+  font-size: 1rem;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.login-card {
+  --background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.login-button {
+  margin-top: 20px;
+  --border-radius: 25px;
+  height: 50px;
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.login-footer a {
+  color: var(--ion-color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.demo-accounts {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(var(--ion-color-light-rgb), 0.5);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.demo-accounts p {
+  margin: 5px 0;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 10px;
+  }
+
+  .login-header h1 {
+    font-size: 2rem;
+  }
+}
