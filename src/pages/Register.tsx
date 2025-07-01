@@ -253,8 +253,8 @@ const Register: React.FC = () => {
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
           message={toastMessage}
-          duration={3000}
-          color="danger"
+          duration={toastColor === "success" ? 5000 : 3000}
+          color={toastColor}
         />
       </IonContent>
     </IonPage>
