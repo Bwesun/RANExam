@@ -92,19 +92,21 @@ const AppRoutes: React.FC = () => {
       <IonReactRouter>
         <IonSplitPane contentId="main">
           <Menu />
-          <IonRouterOutlet id="main">
-            <Route path="/dashboard" component={Dashboard} exact />
-            <Route path="/exams" component={ExamList} exact />
-            <Route path="/exam/:examId" component={TakeExam} exact />
-            <Route path="/result/:examId" component={ExamResult} exact />
-            <Route path="/create-exam" component={CreateExam} exact />
-            <Route path="/user-management" component={UserManagement} exact />
-            <Route path="/admin-dashboard" component={AdminDashboard} exact />
-            <Route path="/" exact>
+          <div id="main">
+            <IonRouterOutlet>
+              <Route path="/dashboard" component={Dashboard} exact />
+              <Route path="/exams" component={ExamList} exact />
+              <Route path="/exam/:examId" component={TakeExam} exact />
+              <Route path="/result/:examId" component={ExamResult} exact />
+              <Route path="/create-exam" component={CreateExam} exact />
+              <Route path="/user-management" component={UserManagement} exact />
+              <Route path="/admin-dashboard" component={AdminDashboard} exact />
+              <Route path="/" exact>
+                <Redirect to="/dashboard" />
+              </Route>
               <Redirect to="/dashboard" />
-            </Route>
-            <Redirect to="/dashboard" />
-          </IonRouterOutlet>
+            </IonRouterOutlet>
+          </div>
         </IonSplitPane>
       </IonReactRouter>
     </IonApp>
