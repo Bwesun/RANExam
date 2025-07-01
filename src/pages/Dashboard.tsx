@@ -20,6 +20,11 @@ import {
   IonButtons,
   IonMenuButton,
   IonBadge,
+  IonSpinner,
+  IonText,
+  IonRefresher,
+  IonRefresherContent,
+  IonToast,
 } from "@ionic/react";
 import {
   documentTextOutline,
@@ -28,75 +33,169 @@ import {
   checkmarkCircleOutline,
   addOutline,
   statsChartOutline,
+  refreshOutline,
 } from "ionicons/icons";
 import { useAuth } from "../contexts/AuthContext";
-import { Exam, ExamResult } from "../types/exam";
+import { useHistory } from "react-router-dom";
+import { examsAPI, resultsAPI, adminAPI } from "../services/api";
 import "./Dashboard.css";
+
+interface DashboardStats {
+  totalExams: number;
+  completedExams: number;
+  averageScore: number;
+  passedExams: number;
+}
+
+interface ExamData {
+  _id: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: string;
+  timeLimit: number;
+  passingScore: number;
+  totalQuestions: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface ResultData {
+  _id: string;
+  exam: {
+    title: string;
+    category: string;
+  };
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  passed: boolean;
+  completedAt: string;
+}
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const [availableExams, setAvailableExams] = useState<Exam[]>([]);
-  const [recentResults, setRecentResults] = useState<ExamResult[]>([]);
+  const history = useHistory();
+  const [availableExams, setAvailableExams] = useState<ExamData[]>([]);
+  const [recentResults, setRecentResults] = useState<ResultData[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    totalExams: 0,
+    completedExams: 0,
+    averageScore: 0,
+    passedExams: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
-    // Mock data - replace with API calls
-    const mockExams: Exam[] = [
-      {
-        id: "1",
-        title: "JavaScript Fundamentals",
-        description: "Test your knowledge of JavaScript basics",
-        duration: 30,
-        questions: [],
-        totalMarks: 100,
-        passingMarks: 60,
-        isActive: true,
-        createdBy: "instructor1",
-        createdAt: new Date(),
-        category: "Programming",
-      },
-      {
-        id: "2",
-        title: "React Concepts",
-        description: "Advanced React concepts and hooks",
-        duration: 45,
-        questions: [],
-        totalMarks: 150,
-        passingMarks: 90,
-        isActive: true,
-        createdBy: "instructor1",
-        createdAt: new Date(),
-        category: "Frontend",
-      },
-      {
-        id: "3",
-        title: "Database Design",
-        description: "SQL and database design principles",
-        duration: 60,
-        questions: [],
-        totalMarks: 200,
-        passingMarks: 120,
-        isActive: true,
-        createdBy: "instructor2",
-        createdAt: new Date(),
-        category: "Database",
-      },
-    ];
+    loadDashboardData();
+  }, [user]);
 
-    setAvailableExams(mockExams);
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadAvailableExams(),
+        loadRecentResults(),
+        loadDashboardStats(),
+      ]);
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+      setToastMessage("Failed to load dashboard data");
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    if (user?.role === "student") {
-      const mockResults: ExamResult[] = [
-        {
-          id: "1",
-          examId: "1",
-          userId: user.id,
-          score: 85,
-          totalQuestions: 20,
-          correctAnswers: 17,
-          percentage: 85,
-          grade: "A",
-          passed: true,
-          timeSpent: 1500,
+  const loadAvailableExams = async () => {
+    try {
+      const response = await examsAPI.getExams({
+        page: 1,
+        limit: 6,
+        isActive: true,
+      });
+
+      if (response.success && response.data) {
+        setAvailableExams(response.data.exams || []);
+      }
+    } catch (error) {
+      console.error("Failed to load exams:", error);
+    }
+  };
+
+  const loadRecentResults = async () => {
+    try {
+      if (user?.role === "student") {
+        const response = await resultsAPI.getUserResults({
+          page: 1,
+          limit: 5,
+        });
+
+        if (response.success && response.data) {
+          setRecentResults(response.data.results || []);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load results:", error);
+    }
+  };
+
+  const loadDashboardStats = async () => {
+    try {
+      if (user?.role === "admin") {
+        const response = await adminAPI.getDashboardStats();
+        if (response.success && response.data) {
+          setDashboardStats(response.data);
+        }
+      } else if (user?.role === "student") {
+        // Calculate stats from results
+        const response = await resultsAPI.getUserResults({
+          page: 1,
+          limit: 100,
+        });
+
+        if (response.success && response.data) {
+          const results = response.data.results || [];
+          const stats = {
+            totalExams: results.length,
+            completedExams: results.length,
+            averageScore: results.length > 0
+              ? Math.round(results.reduce((acc: number, result: any) => acc + result.percentage, 0) / results.length)
+              : 0,
+            passedExams: results.filter((result: any) => result.passed).length,
+          };
+          setDashboardStats(stats);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load stats:", error);
+    }
+  };
+
+  const handleRefresh = async (event: CustomEvent) => {
+    await loadDashboardData();
+    event.detail.complete();
+  };
+
+  const formatDuration = (minutes: number): string => {
+    if (minutes < 60) {
+      return `${minutes} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  };
+
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
           completedAt: new Date(),
           answers: [],
         },
