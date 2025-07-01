@@ -223,6 +223,9 @@ export const examsAPI = {
     status?: string;
     isActive?: boolean;
   }): Promise<ApiResponse<any>> => {
+    if (USE_MOCK_API) {
+      return mockExamsAPI.getExams(params);
+    }
     const response: AxiosResponse<ApiResponse<any>> = await api.get("/exams", {
       params,
     });
@@ -230,6 +233,9 @@ export const examsAPI = {
   },
 
   getExam: async (examId: string): Promise<ApiResponse<any>> => {
+    if (USE_MOCK_API) {
+      return mockExamsAPI.getExam(examId);
+    }
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
       `/exams/${examId}`,
     );
