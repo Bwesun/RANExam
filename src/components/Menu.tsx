@@ -28,6 +28,8 @@ import {
   addSharp,
   logOutOutline,
   schoolOutline,
+  peopleOutline,
+  peopleSharp,
 } from "ionicons/icons";
 import { useAuth } from "../contexts/AuthContext";
 import "./Menu.css";
@@ -85,6 +87,13 @@ const Menu: React.FC = () => {
       iosIcon: statsChartOutline,
       mdIcon: statsChartSharp,
       role: ["instructor", "admin"],
+    },
+    {
+      title: "User Management",
+      url: "/user-management",
+      iosIcon: peopleOutline,
+      mdIcon: peopleSharp,
+      role: ["admin"],
     },
     {
       title: "Profile",
