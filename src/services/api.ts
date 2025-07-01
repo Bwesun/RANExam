@@ -404,6 +404,10 @@ export const attemptsAPI = {
 // Results API
 export const resultsAPI = {
   getResult: async (resultId: string): Promise<ApiResponse<any>> => {
+    if (USE_MOCK_API) {
+      // Mock implementation for getting a single result
+      return { success: true, data: null };
+    }
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
       `/results/${resultId}`,
     );
@@ -415,6 +419,9 @@ export const resultsAPI = {
     limit?: number;
     examId?: string;
   }): Promise<ApiResponse<any>> => {
+    if (USE_MOCK_API) {
+      return mockResultsAPI.getUserResults(params);
+    }
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
       "/results",
       { params },
