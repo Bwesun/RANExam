@@ -45,11 +45,7 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 
 // CORS configuration
-app.use(cors({
-  origin: 'http://localhost:8100',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  credentials: true // only if you’re handling cookies or sessions
-}));
+app.use(cors(['localhost:8100']));
 
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));

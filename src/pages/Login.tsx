@@ -77,22 +77,20 @@ const Login: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>RanExam - Login</IonTitle>
-        </IonToolbar>
-      </IonHeader>
       <IonContent fullscreen className="login-content">
         <div className="login-container">
           <div className="login-header">
             <IonIcon icon={schoolOutline} className="login-icon" />
-            <h1>RanExam</h1>
+            <h1>RAN Exam</h1>
             <p>Welcome back! Please sign in to continue.</p>
           </div>
 
           <IonCard className="login-card">
             <IonCardHeader>
-              <IonCardTitle>Sign In</IonCardTitle>
+              <IonCardTitle color={"primary"} style={{
+                display: 'flex',
+                justifyContent: 'center'
+              }}>Sign In</IonCardTitle>
             </IonCardHeader>
             <IonCardContent>
               <form onSubmit={handleLogin}>
