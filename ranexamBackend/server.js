@@ -45,7 +45,7 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 
 // CORS configuration
-app.use(cors(['localhost:8100']));
+app.use(cors());
 
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
