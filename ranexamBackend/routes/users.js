@@ -1,10 +1,10 @@
 const express = require("express");
 const { body, validationResult, query } = require("express-validator");
-const User = require("../models/User");
-const ExamAttempt = require("../models/ExamAttempt");
+const { User, ExamAttempt, Exam } = require("../models");
 const { protect, authorize } = require("../middleware/auth");
 const { sendEmail } = require("../utils/sendEmail");
 const router = express.Router();
+const { Op } = require("sequelize");
 
 // Apply protection to all routes
 router.use(protect);
@@ -34,7 +34,7 @@ router.get(
       .withMessage("isActive must be boolean"),
     query("sortBy")
       .optional()
-      .isIn(["name", "email", "createdAt", "lastLogin", "examsTaken"])
+      .isIn(["name", "email", "createdAt"])
       .withMessage("Invalid sort field"),
     query("sortOrder")
       .optional()
@@ -63,52 +63,40 @@ router.get(
       } = req.query;
 
       // Build query
-      const query = {};
+      const where = {};
 
-      // Search across multiple fields
       if (search) {
-        query.$or = [
-          { name: { $regex: search, $options: "i" } },
-          { email: { $regex: search, $options: "i" } },
-          { department: { $regex: search, $options: "i" } },
-          { phoneNumber: { $regex: search, $options: "i" } },
+        where[Op.or] = [
+          { name: { [Op.iLike]: `%${search}%` } },
+          { email: { [Op.iLike]: `%${search}%` } },
+          { department: { [Op.iLike]: `%${search}%` } },
+          { phoneNumber: { [Op.iLike]: `%${search}%` } },
         ];
       }
 
-      // Apply filters
-      if (role) query.role = role;
-      if (department) query.department = department;
-      if (isActive !== undefined) query.isActive = isActive === "true";
+      if (role) where.role = role;
+      if (department) where.department = department;
+      if (isActive !== undefined) where.isActive = isActive === "true";
 
-      // For instructors, limit access to students only
       if (req.user.role === "instructor") {
-        query.role = "student";
+        where.role = "student";
       }
 
-      // Build sort object
-      const sort = {};
-      sort[sortBy] = sortOrder === "asc" ? 1 : -1;
-
-      // Execute query with pagination
-      const users = await User.find(query)
-        .select(
-          "-password -resetPasswordToken -resetPasswordExpire -emailVerificationToken",
-        )
-        .sort(sort)
-        .limit(limit * 1)
-        .skip((page - 1) * limit)
-        .lean();
-
-      // Get total count for pagination
-      const total = await User.countDocuments(query);
+      const { count, rows } = await User.findAndCountAll({
+        where,
+        order: [[sortBy, sortOrder]],
+        limit,
+        offset: (page - 1) * limit,
+        attributes: { exclude: ['password', 'resetPasswordToken', 'resetPasswordExpire'] }
+      });
 
       res.status(200).json({
         success: true,
-        count: users.length,
-        total,
+        count: rows.length,
+        total: count,
         page: parseInt(page),
-        pages: Math.ceil(total / limit),
-        data: users,
+        pages: Math.ceil(count / limit),
+        data: rows,
       });
     } catch (error) {
       console.error("Get users error:", error);
@@ -125,11 +113,9 @@ router.get(
 // @access  Private (Admin/Instructor/Own Profile)
 router.get("/:id", async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
-      .select(
-        "-password -resetPasswordToken -resetPasswordExpire -emailVerificationToken",
-      )
-      .lean();
+    const user = await User.findByPk(req.params.id, {
+      attributes: { exclude: ['password', 'resetPasswordToken', 'resetPasswordExpire'] }
+    });
 
     if (!user) {
       return res.status(404).json({
@@ -138,7 +124,6 @@ router.get("/:id", async (req, res) => {
       });
     }
 
-    // Check permissions
     if (
       req.user.role !== "admin" &&
       req.user.role !== "instructor" &&
@@ -150,7 +135,6 @@ router.get("/:id", async (req, res) => {
       });
     }
 
-    // For instructors, only allow viewing students
     if (
       req.user.role === "instructor" &&
       user.role !== "student" &&
@@ -198,7 +182,7 @@ router.post(
       .withMessage("Role must be student, instructor, or admin"),
     body("phoneNumber")
       .optional()
-      .matches(/^\+?[\d\s-()]+$/)
+      .isString()
       .withMessage("Please provide a valid phone number"),
   ],
   async (req, res) => {
@@ -219,35 +203,14 @@ router.post(
         department,
         phoneNumber,
         address,
-        emergencyContact,
-        permissions,
-        notes,
       } = req.body;
 
-      // Check if user already exists
-      const existingUser = await User.findOne({ email });
+      const existingUser = await User.findOne({ where: { email } });
       if (existingUser) {
         return res.status(400).json({
           success: false,
           message: "User already exists with this email",
         });
-      }
-
-      // Set default permissions based on role
-      let defaultPermissions = [];
-      if (role === "instructor") {
-        defaultPermissions = ["create_exam", "edit_exam", "view_results"];
-      } else if (role === "admin") {
-        defaultPermissions = [
-          "create_exam",
-          "edit_exam",
-          "delete_exam",
-          "view_results",
-          "manage_users",
-          "export_data",
-          "system_settings",
-          "view_analytics",
-        ];
       }
 
       const user = await User.create({
@@ -258,13 +221,8 @@ router.post(
         department,
         phoneNumber,
         address,
-        emergencyContact,
-        permissions: permissions || defaultPermissions,
-        notes,
-        isEmailVerified: true, // Admin-created users are auto-verified
       });
 
-      // Send welcome email
       const message = `
       Welcome to RanExam!
       
@@ -289,7 +247,9 @@ router.post(
         console.log("Welcome email could not be sent:", err.message);
       }
 
-      const userResponse = await User.findById(user._id).select("-password");
+      const userResponse = await User.findByPk(user.id, {
+        attributes: { exclude: ['password'] }
+      });
 
       res.status(201).json({
         success: true,
@@ -328,7 +288,7 @@ router.put(
       .withMessage("Role must be student, instructor, or admin"),
     body("phoneNumber")
       .optional()
-      .matches(/^\+?[\d\s-()]+$/)
+      .isString()
       .withMessage("Please provide a valid phone number"),
   ],
   async (req, res) => {
@@ -341,7 +301,7 @@ router.put(
         });
       }
 
-      const user = await User.findById(req.params.id);
+      const user = await User.findByPk(req.params.id);
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -349,8 +309,7 @@ router.put(
         });
       }
 
-      // Check permissions
-      const isOwnProfile = req.user.id === req.params.id;
+      const isOwnProfile = req.user.id === parseInt(req.params.id);
       const isAdmin = req.user.role === "admin";
 
       if (!isAdmin && !isOwnProfile) {
@@ -360,57 +319,23 @@ router.put(
         });
       }
 
-      // Define allowed fields based on role
-      let allowedFields = [
-        "name",
-        "phoneNumber",
-        "address",
-        "emergencyContact",
-        "preferences",
-      ];
+      const [updated] = await User.update(req.body, { where: { id: req.params.id } });
 
-      if (isAdmin) {
-        allowedFields = [
-          ...allowedFields,
-          "email",
-          "role",
-          "department",
-          "isActive",
-          "permissions",
-          "notes",
-        ];
+      if (updated) {
+        const updatedUser = await User.findByPk(req.params.id, {
+          attributes: { exclude: ['password'] }
+        });
+        res.status(200).json({
+          success: true,
+          message: "User updated successfully",
+          data: updatedUser,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
       }
-
-      // Build update object
-      const updateData = {};
-      allowedFields.forEach((field) => {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field];
-        }
-      });
-
-      // Check for email uniqueness if email is being updated
-      if (updateData.email && updateData.email !== user.email) {
-        const existingUser = await User.findOne({ email: updateData.email });
-        if (existingUser) {
-          return res.status(400).json({
-            success: false,
-            message: "Email already exists",
-          });
-        }
-      }
-
-      const updatedUser = await User.findByIdAndUpdate(
-        req.params.id,
-        updateData,
-        { new: true, runValidators: true },
-      ).select("-password");
-
-      res.status(200).json({
-        success: true,
-        message: "User updated successfully",
-        data: updatedUser,
-      });
     } catch (error) {
       console.error("Update user error:", error);
       res.status(500).json({
@@ -426,7 +351,7 @@ router.put(
 // @access  Private (Admin only)
 router.delete("/:id", authorize("admin"), async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findByPk(req.params.id);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -434,12 +359,8 @@ router.delete("/:id", authorize("admin"), async (req, res) => {
       });
     }
 
-    // Prevent deleting the last admin
     if (user.role === "admin") {
-      const adminCount = await User.countDocuments({
-        role: "admin",
-        isActive: true,
-      });
+      const adminCount = await User.count({ where: { role: "admin", isActive: true } });
       if (adminCount <= 1) {
         return res.status(400).json({
           success: false,
@@ -448,7 +369,6 @@ router.delete("/:id", authorize("admin"), async (req, res) => {
       }
     }
 
-    // Soft delete - just deactivate the user
     user.isActive = false;
     user.email = `deleted_${Date.now()}_${user.email}`;
     await user.save();
@@ -465,255 +385,5 @@ router.delete("/:id", authorize("admin"), async (req, res) => {
     });
   }
 });
-
-// @desc    Get user statistics
-// @route   GET /api/users/:id/stats
-// @access  Private (Admin/Instructor/Own Profile)
-router.get("/:id/stats", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Check permissions
-    if (
-      req.user.role !== "admin" &&
-      req.user.role !== "instructor" &&
-      req.user.id !== req.params.id
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to view user statistics",
-      });
-    }
-
-    // Get exam attempts for this user
-    const attempts = await ExamAttempt.find({
-      user: req.params.id,
-      status: "completed",
-    }).populate("exam", "title category difficulty");
-
-    // Calculate statistics
-    const stats = {
-      totalExams: attempts.length,
-      examsPassed: attempts.filter((attempt) => attempt.result.passed).length,
-      examsFailed: attempts.filter((attempt) => !attempt.result.passed).length,
-      averageScore:
-        attempts.length > 0
-          ? Math.round(
-              (attempts.reduce(
-                (sum, attempt) => sum + attempt.score.percentage,
-                0,
-              ) /
-                attempts.length) *
-                100,
-            ) / 100
-          : 0,
-      totalTimeSpent: attempts.reduce(
-        (sum, attempt) => sum + attempt.timeSpent,
-        0,
-      ),
-      lastExamDate:
-        attempts.length > 0
-          ? Math.max(
-              ...attempts.map((attempt) =>
-                new Date(attempt.createdAt).getTime(),
-              ),
-            )
-          : null,
-      recentAttempts: attempts
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        )
-        .slice(0, 5)
-        .map((attempt) => ({
-          examTitle: attempt.exam.title,
-          score: attempt.score.percentage,
-          passed: attempt.result.passed,
-          date: attempt.createdAt,
-          timeSpent: attempt.timeSpent,
-        })),
-      categoryPerformance: {},
-    };
-
-    // Calculate category-wise performance
-    const categoryGroups = attempts.reduce((groups, attempt) => {
-      const category = attempt.exam.category;
-      if (!groups[category]) {
-        groups[category] = [];
-      }
-      groups[category].push(attempt);
-      return groups;
-    }, {});
-
-    Object.keys(categoryGroups).forEach((category) => {
-      const categoryAttempts = categoryGroups[category];
-      stats.categoryPerformance[category] = {
-        totalExams: categoryAttempts.length,
-        averageScore:
-          Math.round(
-            (categoryAttempts.reduce(
-              (sum, attempt) => sum + attempt.score.percentage,
-              0,
-            ) /
-              categoryAttempts.length) *
-              100,
-          ) / 100,
-        passRate: Math.round(
-          (categoryAttempts.filter((attempt) => attempt.result.passed).length /
-            categoryAttempts.length) *
-            100,
-        ),
-      };
-    });
-
-    res.status(200).json({
-      success: true,
-      data: stats,
-    });
-  } catch (error) {
-    console.error("Get user stats error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
-// @desc    Reset user password (Admin only)
-// @route   POST /api/users/:id/reset-password
-// @access  Private (Admin only)
-router.post("/:id/reset-password", authorize("admin"), async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Generate temporary password
-    const tempPassword = Math.random().toString(36).slice(-8);
-    user.password = tempPassword;
-    await user.save();
-
-    // Send email with new password
-    const message = `
-      Your password has been reset by an administrator.
-      
-      New temporary password: ${tempPassword}
-      
-      Please login and change your password immediately.
-      
-      Login URL: ${process.env.FRONTEND_URL}/login
-    `;
-
-    try {
-      await sendEmail({
-        email: user.email,
-        subject: "Password Reset - RanExam",
-        message,
-      });
-
-      res.status(200).json({
-        success: true,
-        message:
-          "Password reset successfully. New password sent to user email.",
-      });
-    } catch (err) {
-      res.status(500).json({
-        success: false,
-        message: "Password reset but email could not be sent",
-      });
-    }
-  } catch (error) {
-    console.error("Reset user password error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error during password reset",
-    });
-  }
-});
-
-// @desc    Bulk user operations
-// @route   POST /api/users/bulk
-// @access  Private (Admin only)
-router.post(
-  "/bulk",
-  authorize("admin"),
-  [
-    body("action")
-      .isIn(["activate", "deactivate", "delete"])
-      .withMessage("Invalid bulk action"),
-    body("userIds")
-      .isArray({ min: 1 })
-      .withMessage("User IDs array is required"),
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array(),
-        });
-      }
-
-      const { action, userIds } = req.body;
-
-      let updateQuery = {};
-      let message = "";
-
-      switch (action) {
-        case "activate":
-          updateQuery = { isActive: true };
-          message = "Users activated successfully";
-          break;
-        case "deactivate":
-          updateQuery = { isActive: false };
-          message = "Users deactivated successfully";
-          break;
-        case "delete":
-          // Soft delete
-          updateQuery = {
-            isActive: false,
-            email: {
-              $concat: [
-                "deleted_",
-                { $toString: new Date().getTime() },
-                "_",
-                "$email",
-              ],
-            },
-          };
-          message = "Users deleted successfully";
-          break;
-      }
-
-      const result = await User.updateMany(
-        { _id: { $in: userIds } },
-        updateQuery,
-      );
-
-      res.status(200).json({
-        success: true,
-        message,
-        modifiedCount: result.modifiedCount,
-      });
-    } catch (error) {
-      console.error("Bulk user operation error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Server error during bulk operation",
-      });
-    }
-  },
-);
 
 module.exports = router;

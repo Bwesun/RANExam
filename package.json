@@ -26,10 +26,13 @@
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.10.0",
     "ionicons": "^7.4.0",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-router": "^5.3.4",
-    "react-router-dom": "^5.3.4"
+    "react-router-dom": "^5.3.4",
+    "sequelize": "^6.37.7"
   },
   "devDependencies": {
     "@capacitor/cli": "7.2.0",

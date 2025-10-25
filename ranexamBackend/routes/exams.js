@@ -1,9 +1,8 @@
 const express = require("express");
 const { body, validationResult, query } = require("express-validator");
-const Exam = require("../models/Exam");
-const Question = require("../models/Question");
-const ExamAttempt = require("../models/ExamAttempt");
+const { Exam, Question, ExamAttempt, User, sequelize } = require("../models");
 const { protect, authorize } = require("../middleware/auth");
+const { Op } = require("sequelize");
 const router = express.Router();
 
 // Apply protection to all routes
@@ -61,84 +60,51 @@ router.get(
         createdBy,
       } = req.query;
 
-      // Build query
-      const query = {};
+      const where = {};
 
-      // Search across multiple fields
       if (search) {
-        query.$or = [
-          { title: { $regex: search, $options: "i" } },
-          { description: { $regex: search, $options: "i" } },
-          { category: { $regex: search, $options: "i" } },
-          { tags: { $in: [new RegExp(search, "i")] } },
+        where[Op.or] = [
+          { title: { [Op.iLike]: `%${search}%` } },
+          { description: { [Op.iLike]: `%${search}%` } },
+          { category: { [Op.iLike]: `%${search}%` } },
         ];
       }
 
-      // Apply filters
-      if (category) query.category = category;
-      if (difficulty) query.difficulty = difficulty;
-      if (status) query.status = status;
-      if (isActive !== undefined) query.isActive = isActive === "true";
-      if (createdBy) query.createdBy = createdBy;
+      if (category) where.category = category;
+      if (difficulty) where.difficulty = difficulty;
+      if (status) where.status = status;
+      if (isActive !== undefined) where.isActive = isActive === "true";
+      if (createdBy) where.createdBy = createdBy;
 
-      // For students, only show published and active exams
       if (req.user.role === "student") {
-        query.isActive = true;
-        query.status = "published";
-        // Check if exam is within schedule
-        const now = new Date();
-        query.$or = [
-          { "schedule.startDate": { $exists: false } },
-          { "schedule.startDate": { $lte: now } },
-        ];
-        query.$and = [
-          {
-            $or: [
-              { "schedule.endDate": { $exists: false } },
-              { "schedule.endDate": { $gte: now } },
-            ],
-          },
-        ];
+        where.isActive = true;
+        where.status = "published";
       }
 
-      // For instructors, show their own exams and published exams
       if (req.user.role === "instructor") {
-        query.$or = [
+        where[Op.or] = [
           { createdBy: req.user.id },
           { status: "published", isActive: true },
         ];
       }
 
-      // Build sort object
-      const sort = { createdAt: -1 };
-
-      // Execute query with pagination
-      const exams = await Exam.find(query)
-        .populate("createdBy", "name email")
-        .populate("questions", "text difficulty category")
-        .sort(sort)
-        .limit(limit * 1)
-        .skip((page - 1) * limit)
-        .lean();
-
-      // Get total count for pagination
-      const total = await Exam.countDocuments(query);
-
-      // Add computed fields
-      const examsWithComputedFields = exams.map((exam) => ({
-        ...exam,
-        questionCount: exam.questions ? exam.questions.length : 0,
-        passPercentage: Math.round((exam.passingMarks / exam.totalMarks) * 100),
-        isAvailable: exam.isActive && exam.status === "published",
-      }));
+      const { count, rows } = await Exam.findAndCountAll({
+        where,
+        include: [
+          { model: User, attributes: ['name', 'email'] },
+          { model: Question, attributes: ['text', 'difficulty', 'category'] },
+        ],
+        limit,
+        offset: (page - 1) * limit,
+      });
 
       res.status(200).json({
         success: true,
-        count: examsWithComputedFields.length,
-        total,
+        count: rows.length,
+        total: count,
         page: parseInt(page),
-        pages: Math.ceil(total / limit),
-        data: examsWithComputedFields,
+        pages: Math.ceil(count / limit),
+        data: rows,
       });
     } catch (error) {
       console.error("Get exams error:", error);
@@ -155,15 +121,15 @@ router.get(
 // @access  Private
 router.get("/:id", async (req, res) => {
   try {
-    const exam = await Exam.findById(req.params.id)
-      .populate("createdBy", "name email")
-      .populate({
-        path: "questions",
-        select:
-          req.user.role === "student"
-            ? "text type options difficulty timeAllocation multimedia formatting"
-            : undefined,
-      });
+    const exam = await Exam.findByPk(req.params.id, {
+      include: [
+        { model: User, attributes: ['name', 'email'] },
+        {
+          model: Question,
+          attributes: req.user.role === 'student' ? ['text', 'type', 'options', 'difficulty', 'timeAllocation', 'multimedia', 'formatting'] : undefined,
+        },
+      ],
+    });
 
     if (!exam) {
       return res.status(404).json({
@@ -172,7 +138,6 @@ router.get("/:id", async (req, res) => {
       });
     }
 
-    // Check permissions for students
     if (req.user.role === "student") {
       if (!exam.isActive || exam.status !== "published") {
         return res.status(403).json({
@@ -180,44 +145,11 @@ router.get("/:id", async (req, res) => {
           message: "Exam is not available",
         });
       }
-
-      // Check schedule
-      const now = new Date();
-      if (exam.schedule.startDate && now < exam.schedule.startDate) {
-        return res.status(403).json({
-          success: false,
-          message: "Exam has not started yet",
-        });
-      }
-      if (exam.schedule.endDate && now > exam.schedule.endDate) {
-        return res.status(403).json({
-          success: false,
-          message: "Exam has ended",
-        });
-      }
-
-      // For students, remove sensitive information and get exam version of questions
-      const studentExam = {
-        ...exam.toObject(),
-        questions: exam.questions.map((q) =>
-          q.getExamVersion ? q.getExamVersion() : q,
-        ),
-      };
-
-      // Remove admin-only fields
-      delete studentExam.analytics;
-      delete studentExam.createdBy;
-
-      return res.status(200).json({
-        success: true,
-        data: studentExam,
-      });
     }
 
-    // Check permissions for instructors
     if (
       req.user.role === "instructor" &&
-      exam.createdBy._id.toString() !== req.user.id &&
+      exam.createdBy !== req.user.id &&
       exam.status !== "published"
     ) {
       return res.status(403).json({
@@ -288,30 +220,14 @@ router.post(
         questions,
         settings,
         schedule,
-        accessibility,
         tags,
         difficulty,
-        estimatedTime,
       } = req.body;
 
-      // Validate that passing marks don't exceed total marks
       if (passingMarks > totalMarks) {
         return res.status(400).json({
           success: false,
           message: "Passing marks cannot exceed total marks",
-        });
-      }
-
-      // Validate questions exist
-      const questionDocs = await Question.find({
-        _id: { $in: questions },
-        status: "approved",
-      });
-
-      if (questionDocs.length !== questions.length) {
-        return res.status(400).json({
-          success: false,
-          message: "Some questions are invalid or not approved",
         });
       }
 
@@ -323,19 +239,21 @@ router.post(
         totalMarks,
         passingMarks,
         instructions,
-        questions,
-        settings: settings || {},
-        schedule: schedule || {},
-        accessibility: accessibility || {},
-        tags: tags || [],
-        difficulty: difficulty || "intermediate",
-        estimatedTime: estimatedTime || duration,
+        settings,
+        schedule,
+        tags,
+        difficulty,
         createdBy: req.user.id,
       });
 
-      const populatedExam = await Exam.findById(exam._id)
-        .populate("createdBy", "name email")
-        .populate("questions", "text difficulty category marks");
+      await exam.addQuestions(questions);
+
+      const populatedExam = await Exam.findByPk(exam.id, {
+        include: [
+          { model: User, attributes: ['name', 'email'] },
+          { model: Question, attributes: ['text', 'difficulty', 'category', 'marks'] },
+        ],
+      });
 
       res.status(201).json({
         success: true,
@@ -386,7 +304,7 @@ router.put(
         });
       }
 
-      const exam = await Exam.findById(req.params.id);
+      const exam = await Exam.findByPk(req.params.id);
       if (!exam) {
         return res.status(404).json({
           success: false,
@@ -394,10 +312,9 @@ router.put(
         });
       }
 
-      // Check permissions
       if (
         req.user.role !== "admin" &&
-        exam.createdBy.toString() !== req.user.id
+        exam.createdBy !== req.user.id
       ) {
         return res.status(403).json({
           success: false,
@@ -405,10 +322,7 @@ router.put(
         });
       }
 
-      // Check if exam has attempts (restrict certain updates)
-      const attemptCount = await ExamAttempt.countDocuments({
-        exam: req.params.id,
-      });
+      const attemptCount = await ExamAttempt.count({ where: { examId: req.params.id } });
       if (attemptCount > 0) {
         const restrictedFields = ["questions", "totalMarks", "passingMarks"];
         const hasRestrictedUpdates = restrictedFields.some(
@@ -424,22 +338,6 @@ router.put(
         }
       }
 
-      // Validate questions if provided
-      if (req.body.questions) {
-        const questionDocs = await Question.find({
-          _id: { $in: req.body.questions },
-          status: "approved",
-        });
-
-        if (questionDocs.length !== req.body.questions.length) {
-          return res.status(400).json({
-            success: false,
-            message: "Some questions are invalid or not approved",
-          });
-        }
-      }
-
-      // Validate passing marks
       const totalMarks = req.body.totalMarks || exam.totalMarks;
       const passingMarks = req.body.passingMarks || exam.passingMarks;
       if (passingMarks > totalMarks) {
@@ -449,45 +347,26 @@ router.put(
         });
       }
 
-      const allowedFields = [
-        "title",
-        "description",
-        "category",
-        "duration",
-        "totalMarks",
-        "passingMarks",
-        "instructions",
-        "questions",
-        "settings",
-        "schedule",
-        "accessibility",
-        "tags",
-        "difficulty",
-        "estimatedTime",
-        "isActive",
-        "status",
-      ];
+      const [updated] = await Exam.update(req.body, { where: { id: req.params.id } });
 
-      const updateData = {};
-      allowedFields.forEach((field) => {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field];
-        }
-      });
-
-      const updatedExam = await Exam.findByIdAndUpdate(
-        req.params.id,
-        updateData,
-        { new: true, runValidators: true },
-      )
-        .populate("createdBy", "name email")
-        .populate("questions", "text difficulty category marks");
-
-      res.status(200).json({
-        success: true,
-        message: "Exam updated successfully",
-        data: updatedExam,
-      });
+      if (updated) {
+        const updatedExam = await Exam.findByPk(req.params.id, {
+          include: [
+            { model: User, attributes: ['name', 'email'] },
+            { model: Question, attributes: ['text', 'difficulty', 'category', 'marks'] },
+          ],
+        });
+        res.status(200).json({
+          success: true,
+          message: "Exam updated successfully",
+          data: updatedExam,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: "Exam not found",
+        });
+      }
     } catch (error) {
       console.error("Update exam error:", error);
       res.status(500).json({
@@ -503,7 +382,7 @@ router.put(
 // @access  Private (Creator/Admin)
 router.delete("/:id", async (req, res) => {
   try {
-    const exam = await Exam.findById(req.params.id);
+    const exam = await Exam.findByPk(req.params.id);
     if (!exam) {
       return res.status(404).json({
         success: false,
@@ -511,10 +390,9 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    // Check permissions
     if (
       req.user.role !== "admin" &&
-      exam.createdBy.toString() !== req.user.id
+      exam.createdBy !== req.user.id
     ) {
       return res.status(403).json({
         success: false,
@@ -522,12 +400,8 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    // Check if exam has attempts
-    const attemptCount = await ExamAttempt.countDocuments({
-      exam: req.params.id,
-    });
+    const attemptCount = await ExamAttempt.count({ where: { examId: req.params.id } });
     if (attemptCount > 0) {
-      // Soft delete - just archive the exam
       exam.status = "archived";
       exam.isActive = false;
       await exam.save();
@@ -538,8 +412,7 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    // Hard delete if no attempts
-    await exam.deleteOne();
+    await exam.destroy();
 
     res.status(200).json({
       success: true,
@@ -550,198 +423,6 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error during exam deletion",
-    });
-  }
-});
-
-// @desc    Get exam analytics
-// @route   GET /api/exams/:id/analytics
-// @access  Private (Creator/Admin)
-router.get("/:id/analytics", async (req, res) => {
-  try {
-    const exam = await Exam.findById(req.params.id);
-    if (!exam) {
-      return res.status(404).json({
-        success: false,
-        message: "Exam not found",
-      });
-    }
-
-    // Check permissions
-    if (
-      req.user.role !== "admin" &&
-      exam.createdBy.toString() !== req.user.id
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to view exam analytics",
-      });
-    }
-
-    // Get attempt statistics
-    const attemptStats = await ExamAttempt.getAttemptStats(req.params.id);
-
-    // Get detailed analytics
-    const attempts = await ExamAttempt.find({
-      exam: req.params.id,
-      status: "completed",
-    })
-      .populate("user", "name email role")
-      .select("user score result timeSpent createdAt answers")
-      .sort({ createdAt: -1 });
-
-    // Calculate question-wise analytics
-    const questionAnalytics = {};
-    attempts.forEach((attempt) => {
-      attempt.answers.forEach((answer) => {
-        const qId = answer.question.toString();
-        if (!questionAnalytics[qId]) {
-          questionAnalytics[qId] = {
-            totalAttempts: 0,
-            correctAttempts: 0,
-            totalTimeSpent: 0,
-          };
-        }
-
-        questionAnalytics[qId].totalAttempts++;
-        if (answer.isCorrect) {
-          questionAnalytics[qId].correctAttempts++;
-        }
-        questionAnalytics[qId].totalTimeSpent += answer.timeSpent || 0;
-      });
-    });
-
-    // Calculate difficulty and discrimination indices
-    Object.keys(questionAnalytics).forEach((qId) => {
-      const stats = questionAnalytics[qId];
-      stats.difficultyIndex =
-        stats.totalAttempts > 0
-          ? stats.correctAttempts / stats.totalAttempts
-          : 0;
-      stats.averageTimeSpent =
-        stats.totalAttempts > 0
-          ? stats.totalTimeSpent / stats.totalAttempts
-          : 0;
-    });
-
-    // Grade distribution
-    const gradeDistribution = attempts.reduce((dist, attempt) => {
-      const grade = attempt.result.grade || "F";
-      dist[grade] = (dist[grade] || 0) + 1;
-      return dist;
-    }, {});
-
-    // Score distribution
-    const scoreRanges = {
-      "90-100": 0,
-      "80-89": 0,
-      "70-79": 0,
-      "60-69": 0,
-      "50-59": 0,
-      "0-49": 0,
-    };
-
-    attempts.forEach((attempt) => {
-      const score = attempt.score.percentage;
-      if (score >= 90) scoreRanges["90-100"]++;
-      else if (score >= 80) scoreRanges["80-89"]++;
-      else if (score >= 70) scoreRanges["70-79"]++;
-      else if (score >= 60) scoreRanges["60-69"]++;
-      else if (score >= 50) scoreRanges["50-59"]++;
-      else scoreRanges["0-49"]++;
-    });
-
-    const analytics = {
-      overview: attemptStats[0] || {
-        totalAttempts: 0,
-        averageScore: 0,
-        highestScore: 0,
-        lowestScore: 0,
-        passCount: 0,
-        passRate: 0,
-        averageTimeSpent: 0,
-      },
-      recentAttempts: attempts.slice(0, 10).map((attempt) => ({
-        studentName: attempt.user.name,
-        studentEmail: attempt.user.email,
-        score: attempt.score.percentage,
-        grade: attempt.result.grade,
-        passed: attempt.result.passed,
-        timeSpent: attempt.timeSpent,
-        completedAt: attempt.createdAt,
-      })),
-      questionAnalytics,
-      gradeDistribution,
-      scoreDistribution: scoreRanges,
-      trends: {
-        // Could add time-based trends here
-      },
-    };
-
-    res.status(200).json({
-      success: true,
-      data: analytics,
-    });
-  } catch (error) {
-    console.error("Get exam analytics error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
-// @desc    Duplicate exam
-// @route   POST /api/exams/:id/duplicate
-// @access  Private (Creator/Admin)
-router.post("/:id/duplicate", async (req, res) => {
-  try {
-    const originalExam = await Exam.findById(req.params.id);
-    if (!originalExam) {
-      return res.status(404).json({
-        success: false,
-        message: "Exam not found",
-      });
-    }
-
-    // Check permissions
-    if (
-      req.user.role !== "admin" &&
-      originalExam.createdBy.toString() !== req.user.id
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to duplicate this exam",
-      });
-    }
-
-    const examData = originalExam.toObject();
-    delete examData._id;
-    delete examData.createdAt;
-    delete examData.updatedAt;
-    delete examData.analytics;
-
-    // Modify title to indicate it's a copy
-    examData.title = `${examData.title} (Copy)`;
-    examData.status = "draft";
-    examData.createdBy = req.user.id;
-
-    const duplicatedExam = await Exam.create(examData);
-
-    const populatedExam = await Exam.findById(duplicatedExam._id)
-      .populate("createdBy", "name email")
-      .populate("questions", "text difficulty category marks");
-
-    res.status(201).json({
-      success: true,
-      message: "Exam duplicated successfully",
-      data: populatedExam,
-    });
-  } catch (error) {
-    console.error("Duplicate exam error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error during exam duplication",
     });
   }
 });

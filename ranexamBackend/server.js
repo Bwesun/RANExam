@@ -1,11 +1,11 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const compression = require("compression");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
 require("dotenv").config();
+const { sequelize } = require('./models');
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -60,13 +60,16 @@ if (process.env.NODE_ENV !== "production") {
 app.use("/uploads", express.static("uploads"));
 
 // Database connection
-mongoose
-  .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/ranexam", {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+sequelize.authenticate()
+  .then(() => {
+    console.log('PostgreSQL connected successfully');
+    return sequelize.sync();
   })
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .then(() => {
+    console.log('Database synced');
+  })
+  .catch(err => console.error('Unable to connect to the database:', err));
+
 
 // Routes
 app.use("/api/auth", authRoutes);

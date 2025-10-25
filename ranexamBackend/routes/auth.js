@@ -3,10 +3,11 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { body, validationResult } = require("express-validator");
-const User = require("../models/User");
+const { User } = require("../models");
 const { protect } = require("../middleware/auth");
 const { sendEmail } = require("../utils/sendEmail");
 const router = express.Router();
+const { Op } = require("sequelize");
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -43,18 +44,12 @@ router.post(
       const { name, email, password, role, department, phoneNumber } = req.body;
 
       // Check if user already exists
-      const existingUser = await User.findOne({ email });
+      const existingUser = await User.findOne({ where: { email } });
       if (existingUser) {
         return res.status(400).json({
           success: false,
           message: "User already exists with this email",
         });
-      }
-
-      // Set default permissions based on role
-      let permissions = [];
-      if (role === "instructor") {
-        permissions = ["create_exam", "edit_exam", "view_results"];
       }
 
       // Create user
@@ -65,31 +60,7 @@ router.post(
         role,
         department,
         phoneNumber,
-        permissions,
       });
-
-      // Generate email verification token
-      const verificationToken = user.getEmailVerificationToken();
-      await user.save();
-
-      // Send verification email
-      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
-      const message = `
-      Welcome to RanExam! Please verify your email by clicking the link below:
-      ${verificationUrl}
-      
-      If you did not create an account, please ignore this email.
-    `;
-
-      try {
-        await sendEmail({
-          email: user.email,
-          subject: "Email Verification - RanExam",
-          message,
-        });
-      } catch (err) {
-        console.log("Email could not be sent:", err.message);
-      }
 
       // Generate JWT token
       const token = user.getSignedJwtToken();
@@ -100,14 +71,12 @@ router.post(
           "User registered successfully. Please check your email to verify your account.",
         token,
         user: {
-          id: user._id,
+          id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
           department: user.department,
           isActive: user.isActive,
-          isEmailVerified: user.isEmailVerified,
-          permissions: user.permissions,
         },
       });
     } catch (error) {
@@ -145,8 +114,8 @@ router.post(
 
       const { email, password, rememberMe } = req.body;
 
-      // Check for user and include password
-      const user = await User.findOne({ email }).select("+password");
+      // Check for user
+      const user = await User.findOne({ where: { email } });
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -171,36 +140,21 @@ router.post(
         });
       }
 
-      // Update login stats
-      await user.updateLoginStats();
-
       // Generate JWT token
-      const tokenExpiry = rememberMe ? "30d" : process.env.JWT_EXPIRE;
-      const token = jwt.sign(
-        {
-          id: user._id,
-          role: user.role,
-          permissions: user.permissions,
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: tokenExpiry },
-      );
+      const token = user.getSignedJwtToken();
 
       res.status(200).json({
         success: true,
         message: "Login successful",
         token,
         user: {
-          id: user._id,
+          id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
           department: user.department,
           isActive: user.isActive,
-          isEmailVerified: user.isEmailVerified,
-          permissions: user.permissions,
           profileImage: user.profileImage,
-          lastLogin: user.lastLogin,
         },
       });
     } catch (error) {
@@ -218,9 +172,7 @@ router.post(
 // @access  Private
 router.get("/me", protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
-      .select("-password")
-      .populate("examStats");
+    const user = await User.findByPk(req.user.id);
 
     res.status(200).json({
       success: true,
@@ -249,7 +201,7 @@ router.put(
       .withMessage("Name must be between 2 and 100 characters"),
     body("phoneNumber")
       .optional()
-      .matches(/^\+?[\d\s-()]+$/)
+      .isString()
       .withMessage("Please provide a valid phone number"),
     body("address")
       .optional()
@@ -266,32 +218,21 @@ router.put(
         });
       }
 
-      const allowedFields = [
-        "name",
-        "phoneNumber",
-        "address",
-        "emergencyContact",
-        "dateOfBirth",
-        "preferences",
-      ];
+      const [updated] = await User.update(req.body, { where: { id: req.user.id } });
 
-      const updateData = {};
-      allowedFields.forEach((field) => {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field];
-        }
-      });
-
-      const user = await User.findByIdAndUpdate(req.user.id, updateData, {
-        new: true,
-        runValidators: true,
-      }).select("-password");
-
-      res.status(200).json({
-        success: true,
-        message: "Profile updated successfully",
-        user,
-      });
+      if (updated) {
+        const updatedUser = await User.findByPk(req.user.id);
+        res.status(200).json({
+          success: true,
+          message: "Profile updated successfully",
+          user: updatedUser,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
     } catch (error) {
       console.error("Profile update error:", error);
       res.status(500).json({
@@ -334,10 +275,8 @@ router.put(
 
       const { currentPassword, newPassword } = req.body;
 
-      // Get user with password
-      const user = await User.findById(req.user.id).select("+password");
+      const user = await User.findByPk(req.user.id);
 
-      // Check current password
       const isMatch = await user.comparePassword(currentPassword);
       if (!isMatch) {
         return res.status(400).json({
@@ -346,7 +285,6 @@ router.put(
         });
       }
 
-      // Update password
       user.password = newPassword;
       await user.save();
 
@@ -387,7 +325,7 @@ router.post(
 
       const { email } = req.body;
 
-      const user = await User.findOne({ email });
+      const user = await User.findOne({ where: { email } });
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -395,11 +333,9 @@ router.post(
         });
       }
 
-      // Generate reset token
       const resetToken = user.getResetPasswordToken();
       await user.save();
 
-      // Create reset URL
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
       const message = `
@@ -463,15 +399,16 @@ router.put(
         });
       }
 
-      // Get hashed token
       const resetPasswordToken = crypto
         .createHash("sha256")
         .update(req.params.resettoken)
         .digest("hex");
 
       const user = await User.findOne({
-        resetPasswordToken,
-        resetPasswordExpire: { $gt: Date.now() },
+        where: {
+          resetPasswordToken,
+          resetPasswordExpire: { [Op.gt]: Date.now() },
+        },
       });
 
       if (!user) {
@@ -481,13 +418,11 @@ router.put(
         });
       }
 
-      // Set new password
       user.password = req.body.password;
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
       await user.save();
 
-      // Generate JWT token
       const token = user.getSignedJwtToken();
 
       res.status(200).json({
@@ -504,67 +439,5 @@ router.put(
     }
   },
 );
-
-// @desc    Verify email
-// @route   GET /api/auth/verify-email/:token
-// @access  Public
-router.get("/verify-email/:token", async (req, res) => {
-  try {
-    // Get hashed token
-    const emailVerificationToken = crypto
-      .createHash("sha256")
-      .update(req.params.token)
-      .digest("hex");
-
-    const user = await User.findOne({ emailVerificationToken });
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid verification token",
-      });
-    }
-
-    // Update user
-    user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Email verified successfully",
-    });
-  } catch (error) {
-    console.error("Email verification error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
-// @desc    Logout user
-// @route   POST /api/auth/logout
-// @access  Private
-router.post("/logout", protect, async (req, res) => {
-  try {
-    // Update session duration if provided
-    const { sessionDuration } = req.body;
-    if (sessionDuration) {
-      await req.user.updateLoginStats(sessionDuration);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Logged out successfully",
-    });
-  } catch (error) {
-    console.error("Logout error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error during logout",
-    });
-  }
-});
 
 module.exports = router;
