@@ -134,6 +134,7 @@ export const authAPI = {
       "/auth/login",
       data,
     );
+    console.log("API Response:", response.data);
     return response.data;
   },
 
@@ -247,6 +248,7 @@ export const examsAPI = {
       "/exams",
       data,
     );
+    console.log("Create Exam Response:", response.data, "Data Sent:", data);
     return response.data;
   },
 

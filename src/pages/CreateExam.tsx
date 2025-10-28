@@ -18,8 +18,6 @@ import {
   IonSelectOption,
   IonList,
   IonIcon,
-  IonFab,
-  IonFabButton,
   IonButtons,
   IonMenuButton,
   IonToggle,
@@ -30,7 +28,6 @@ import {
   IonGrid,
   IonRow,
   IonCol,
-  IonCheckbox,
   IonRadio,
   IonRadioGroup,
   IonReorder,
@@ -53,6 +50,9 @@ import {
 import { useHistory } from "react-router-dom";
 import { Exam, Question } from "../types/exam";
 import "./CreateExam.css";
+import axios from "axios";
+import { useAuth } from "../contexts/AuthContext";
+import { examsAPI, CreateExamRequest } from "../services/api";
 
 interface ExamForm {
   title: string;
@@ -81,6 +81,7 @@ interface QuestionForm {
 
 const CreateExam: React.FC = () => {
   const history = useHistory();
+  const {user} = useAuth();
   const [currentStep, setCurrentStep] = useState<
     "basic" | "questions" | "settings" | "preview"
   >("basic");
@@ -119,6 +120,7 @@ const CreateExam: React.FC = () => {
   });
 
   const categories = [
+    "RAN Exam",
     "Programming",
     "Frontend",
     "Backend",
@@ -295,33 +297,50 @@ const CreateExam: React.FC = () => {
     return true;
   };
 
-  const saveExam = () => {
-    if (!validateExam()) return;
+  const saveExam = async () => {
+  if (!validateExam()) return;
 
-    const newExam: Exam = {
-      id: Date.now().toString(),
-      title: examForm.title,
-      description: examForm.description,
-      category: examForm.category,
-      duration: examForm.duration,
-      questions: questions,
-      totalMarks: examForm.totalMarks,
-      passingMarks: examForm.passingMarks,
-      isActive: true,
-      createdBy: "current-user-id",
-      createdAt: new Date(),
-    };
+  const newExam: Exam = {
+    id: Date.now().toString(),
+    title: examForm.title,
+    description: examForm.description,
+    category: examForm.category,
+    duration: examForm.duration,
+    questions: questions,
+    totalMarks: examForm.totalMarks,
+    passingMarks: examForm.passingMarks,
+    isActive: true,
+    createdBy: user?.id || "",
+    createdAt: new Date(),
+  };
 
-    // TODO: Save to backend
-    console.log("Saving exam:", newExam);
+  // Map UI model (Exam) -> API model (CreateExamRequest)
+  const createReq: CreateExamRequest = {
+    ...newExam,
+    title: newExam.title,
+    description: newExam.description,
+    category: newExam.category,
+    difficulty: "intermediate",
+    timeLimit: newExam.duration ?? 60,
+    passingScore: newExam.passingMarks ?? Math.round(newExam.totalMarks * 0.5),
+    instructions: examForm.instructions,
+    isActive: newExam.isActive,
+    // tags: examForm.tags,
+    // settings: examForm.settings,
+  };
 
+  try {
+    const response = await examsAPI.createExam(createReq);
+    console.log("Exam created:", response);
     setToastMessage("Exam created successfully!");
     setShowToast(true);
-
-    setTimeout(() => {
-      history.push("/dashboard");
-    }, 2000);
-  };
+    setTimeout(() => history.push("/dashboard"), 2000);
+  } catch (error) {
+    console.error("Error creating exam:", error);
+    setToastMessage("Error creating exam.");
+    setShowToast(true);
+  }
+};
 
   const renderBasicInfo = () => (
     <div className="step-content">
