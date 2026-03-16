@@ -25,7 +25,6 @@ const protect = async (req, res, next) => {
       message: "Not authorized to access this route",
     });
   }
-  console.log("TOKEN:", token);
 
   try {
     // Verify token
@@ -67,7 +66,6 @@ const protect = async (req, res, next) => {
       });
     }
 
-    console.log("Authorization error:", error);
     return res.status(401).json({
       success: false,
       message: "Not authorized to access this route",
@@ -78,7 +76,6 @@ const protect = async (req, res, next) => {
 // Grant access to specific roles
 const authorize = (...roles) => {
   return (req, res, next) => {
-    console.log("User Token from Authorize :", req.user );
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -109,7 +106,6 @@ const checkPermission = (permission) => {
 
     // Admins have all permissions
     if (req.user.role === "admin") {
-      console.log("Admin User :", req.user.role );
       return next();
     }
 

@@ -12,14 +12,10 @@ import {
   IonToolbar,
   IonItem,
   IonLabel,
-  IonList,
   IonButtons,
   IonMenuButton,
-  IonBadge,
   IonIcon,
   IonSearchbar,
-  IonSegment,
-  IonSegmentButton,
   IonSpinner,
   IonRefresher,
   IonRefresherContent,
@@ -37,11 +33,9 @@ import {
   documentTextOutline,
   checkmarkCircleOutline,
   playOutline,
-  filterOutline,
   schoolOutline,
 } from "ionicons/icons";
 import { useHistory } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { examsAPI } from "../services/api";
 import "./ExamList.css";
 
@@ -51,9 +45,11 @@ interface ExamData {
   description: string;
   category: string;
   difficulty: string;
-  timeLimit: number;
-  passingScore: number;
-  totalQuestions: number;
+  duration: number;
+  questionCount?: number;
+  passPercentage?: number;
+  totalMarks?: number;
+  passingMarks?: number;
   isActive: boolean;
   createdAt: string;
   createdBy?: {
@@ -62,7 +58,6 @@ interface ExamData {
 }
 
 const ExamList: React.FC = () => {
-  const { user } = useAuth();
   const history = useHistory();
   const [exams, setExams] = useState<ExamData[]>([]);
   const [filteredExams, setFilteredExams] = useState<ExamData[]>([]);
@@ -92,7 +87,10 @@ const ExamList: React.FC = () => {
       });
 
       if (response.success && response.data) {
-        const examData = response.data.exams || [];
+        const rawData = response.data;
+        const examData = Array.isArray(rawData)
+          ? rawData
+          : (rawData.data ?? []);
         setExams(examData);
 
         // Extract unique categories
@@ -323,18 +321,18 @@ const ExamList: React.FC = () => {
 
                     <div className="detail-item">
                       <IonIcon icon={timeOutline} />
-                      <span>{formatDuration(exam.timeLimit)}</span>
+                      <span>{formatDuration(exam.duration)}</span>
                     </div>
 
                     <div className="detail-item">
                       <IonIcon icon={checkmarkCircleOutline} />
-                      <span>{exam.totalQuestions} questions</span>
+                      <span>{exam.questionCount ?? 0} questions</span>
                     </div>
                   </div>
 
                   <div className="exam-meta">
                     <span className="passing-score">
-                      Passing Score: {exam.passingScore}%
+                      Passing Score: {exam.passPercentage ?? 0}%
                     </span>
                     <span className="created-date">
                       Created: {formatDate(exam.createdAt)}

@@ -18,12 +18,6 @@ import {
   homeSharp,
   documentTextOutline,
   documentTextSharp,
-  trophyOutline,
-  trophySharp,
-  personOutline,
-  personSharp,
-  statsChartOutline,
-  statsChartSharp,
   addOutline,
   addSharp,
   logOutOutline,
@@ -61,13 +55,6 @@ const Menu: React.FC = () => {
       role: ["student"],
     },
     {
-      title: "My Results",
-      url: "/results",
-      iosIcon: trophyOutline,
-      mdIcon: trophySharp,
-      role: ["student"],
-    },
-    {
       title: "Create Exam",
       url: "/create-exam",
       iosIcon: addOutline,
@@ -75,25 +62,11 @@ const Menu: React.FC = () => {
       role: ["instructor", "admin"],
     },
     {
-      title: "Manage Exams",
-      url: "/manage-exams",
-      iosIcon: documentTextOutline,
-      mdIcon: documentTextSharp,
-      role: ["instructor", "admin"],
-    },
-    {
-      title: "Analytics",
-      url: "/analytics",
-      iosIcon: statsChartOutline,
-      mdIcon: statsChartSharp,
-      role: ["instructor", "admin"],
-    },
-    {
       title: "User Management",
       url: "/user-management",
       iosIcon: peopleOutline,
       mdIcon: peopleSharp,
-      role: ["admin"],
+      role: ["instructor", "admin"],
     },
     {
       title: "Admin Dashboard",
@@ -101,12 +74,6 @@ const Menu: React.FC = () => {
       iosIcon: peopleOutline,
       mdIcon: peopleSharp,
       role: ["instructor", "admin"],
-    },
-    {
-      title: "Profile",
-      url: "/profile",
-      iosIcon: personOutline,
-      mdIcon: personSharp,
     },
   ];
 

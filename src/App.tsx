@@ -59,11 +59,11 @@ const AppRoutes: React.FC = () => {
   useEffect(() => {
     const setStatusBar = async () => {
       try {
-        await StatusBar.setBackgroundColor({ color: 'var(--ion-color-primary)' }); // Your color here
-        await StatusBar.setOverlaysWebView({ overlay: false }); // Avoid overlapping
-        await StatusBar.setStyle({style: Style.Default})
+        await StatusBar.setBackgroundColor({ color: "#3880ff" });
+        await StatusBar.setOverlaysWebView({ overlay: false });
+        await StatusBar.setStyle({ style: Style.Default });
       } catch (error) {
-        console.error('Error setting status bar:', error);
+        console.error("Error setting status bar:", error);
       }
     };
 
@@ -103,20 +103,6 @@ const AppRoutes: React.FC = () => {
         </IonReactRouter>
       </IonApp>
     );
-    
-    useEffect(() => {
-    const setStatusBar = async () => {
-      try {
-        await StatusBar.setBackgroundColor({ color: '#2563eb' }); // Your color here
-        await StatusBar.setOverlaysWebView({ overlay: false }); // Avoid overlapping
-        await StatusBar.setStyle({style: Style.Default})
-      } catch (error) {
-        console.error('Error setting status bar:', error);
-      }
-    };
-
-    setStatusBar();
-  }, []);
   }
 
   return (
@@ -128,7 +114,7 @@ const AppRoutes: React.FC = () => {
             <Route path="/dashboard" component={Dashboard} exact />
             <Route path="/exams" component={ExamList} exact />
             <Route path="/exam/:examId" component={TakeExam} exact />
-            <Route path="/result/:examId" component={ExamResult} exact />
+            <Route path="/result/:attemptId" component={ExamResult} exact />
             <Route path="/create-exam" component={CreateExam} exact />
             <Route path="/user-management" component={UserManagement} exact />
             <Route path="/admin-dashboard" component={AdminDashboard} exact />

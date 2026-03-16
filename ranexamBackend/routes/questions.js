@@ -275,7 +275,7 @@ router.post(
         bloomsLevel,
         cognitiveLevel,
         createdBy: req.user.id,
-        status: req.user.role === "admin" ? "approved" : "draft",
+        status: "approved",
       });
 
       const populatedQuestion = await Question.findById(question._id).populate(
@@ -608,7 +608,7 @@ router.post(
           const questionData = {
             ...questions[i],
             createdBy: req.user.id,
-            status: req.user.role === "admin" ? "approved" : "draft",
+            status: "approved",
           };
 
           const question = await Question.create(questionData);

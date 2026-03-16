@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   IonButton,
   IonCard,
@@ -12,7 +12,6 @@ import {
   IonToolbar,
   IonIcon,
   IonItem,
-  IonLabel,
   IonList,
   IonButtons,
   IonBackButton,
@@ -20,110 +19,140 @@ import {
   IonGrid,
   IonRow,
   IonCol,
-  IonText,
   IonChip,
+  IonSpinner,
 } from "@ionic/react";
 import { useParams, useLocation, useHistory } from "react-router-dom";
 import {
   trophyOutline,
   checkmarkCircleOutline,
   closeCircleOutline,
-  timeOutline,
   refreshOutline,
   homeOutline,
   documentTextOutline,
   ribbonOutline,
   eyeOutline,
 } from "ionicons/icons";
-import { useAuth } from "../contexts/AuthContext";
+import { attemptsAPI } from "../services/api";
 import "./ExamResult.css";
 
 interface QuestionResult {
   id: string;
   text: string;
   options: string[];
-  correctAnswer: number;
+  correctAnswer?: number;
   selectedAnswer?: number;
   isCorrect: boolean;
 }
 
-const ExamResult: React.FC = () => {
-  const { examId } = useParams<{ examId: string }>();
-  const location = useLocation<any>();
-  const history = useHistory();
-  const { user } = useAuth();
+interface ResultRouteState {
+  examId?: string;
+  examTitle?: string;
+  score?: number;
+  totalQuestions?: number;
+  percentage?: number;
+  passed?: boolean;
+}
 
-  const [examTitle, setExamTitle] = useState("");
-  const [score, setScore] = useState(0);
-  const [totalQuestions, setTotalQuestions] = useState(0);
-  const [percentage, setPercentage] = useState(0);
-  const [passed, setPassed] = useState(false);
+const ExamResult: React.FC = () => {
+  const { attemptId } = useParams<{ attemptId: string }>();
+  const location = useLocation<ResultRouteState>();
+  const history = useHistory();
+
+  const [examId, setExamId] = useState<string | null>(location.state?.examId || null);
+  const [examTitle, setExamTitle] = useState(location.state?.examTitle || "Exam");
+  const [score, setScore] = useState(location.state?.score || 0);
+  const [totalQuestions, setTotalQuestions] = useState(location.state?.totalQuestions || 0);
+  const [percentage, setPercentage] = useState(location.state?.percentage || 0);
+  const [passed, setPassed] = useState(location.state?.passed || false);
   const [questions, setQuestions] = useState<QuestionResult[]>([]);
-  const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
   const [showDetailedResults, setShowDetailedResults] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    if (location.state) {
-      const {
-        examTitle: title,
-        score: examScore,
-        totalQuestions: total,
-        percentage: examPercentage,
-        passed: examPassed,
-        answers,
-        questions: examQuestions,
-      } = location.state;
+    const loadResult = async () => {
+      setLoading(true);
+      try {
+        const response = await attemptsAPI.getAttemptResult(attemptId);
+        const attempt = response.data?.data ?? response.data;
 
-      setExamTitle(title || "Exam");
-      setScore(examScore || 0);
-      setTotalQuestions(total || 0);
-      setPercentage(examPercentage || 0);
-      setPassed(examPassed || false);
-      setUserAnswers(answers || {});
+        if (!response.success || !attempt) {
+          setLoadError("No exam result found");
+          return;
+        }
 
-      // Process questions with results
-      if (examQuestions && answers) {
-        const processedQuestions = examQuestions.map((q: any) => ({
-          id: q.id,
-          text: q.text,
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          selectedAnswer: answers[q.id],
-          isCorrect: answers[q.id] === q.correctAnswer,
-        }));
-        setQuestions(processedQuestions);
+        const answerList = attempt.answers || [];
+        const correctAnswers = answerList.filter((answer: any) => answer.isCorrect).length;
+        const total = answerList.length;
+        const resultPercentage =
+          attempt.score?.percentage ?? (total > 0 ? Math.round((correctAnswers / total) * 100) : 0);
+
+        setExamId(attempt.exam?._id || null);
+        setExamTitle(attempt.exam?.title || location.state?.examTitle || "Exam");
+        setScore(correctAnswers);
+        setTotalQuestions(total);
+        setPercentage(resultPercentage);
+        setPassed(Boolean(attempt.result?.passed));
+
+        const mappedQuestions: QuestionResult[] = answerList.map((answer: any, index: number) => {
+          const question = answer.question || {};
+          return {
+            id: question._id || String(index),
+            text: question.text || "Question",
+            options: (question.options || []).map((option: any) =>
+              typeof option === "string" ? option : option.text,
+            ),
+            correctAnswer:
+              typeof question.correctAnswer === "number" ? question.correctAnswer : undefined,
+            selectedAnswer:
+              typeof answer.selectedOption === "number" ? answer.selectedOption : undefined,
+            isCorrect: Boolean(answer.isCorrect),
+          };
+        });
+
+        setQuestions(mappedQuestions);
+      } catch (error: any) {
+        const message =
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to load exam result";
+        setLoadError(message);
+      } finally {
+        setLoading(false);
       }
-    }
-  }, [location.state]);
+    };
 
-  const getGradeColor = (percentage: number): string => {
-    if (percentage >= 90) return "success";
-    if (percentage >= 80) return "primary";
-    if (percentage >= 70) return "warning";
-    if (percentage >= 60) return "tertiary";
+    void loadResult();
+  }, [attemptId, location.state]);
+
+  const getGradeColor = (examPercentage: number): string => {
+    if (examPercentage >= 90) return "success";
+    if (examPercentage >= 80) return "primary";
+    if (examPercentage >= 70) return "warning";
+    if (examPercentage >= 60) return "tertiary";
     return "danger";
   };
 
-  const getGradeLetter = (percentage: number): string => {
-    if (percentage >= 90) return "A";
-    if (percentage >= 80) return "B";
-    if (percentage >= 70) return "C";
-    if (percentage >= 60) return "D";
+  const getGradeLetter = (examPercentage: number): string => {
+    if (examPercentage >= 90) return "A";
+    if (examPercentage >= 80) return "B";
+    if (examPercentage >= 70) return "C";
+    if (examPercentage >= 60) return "D";
     return "F";
   };
 
   const getMotivationalMessage = (
-    percentage: number,
-    passed: boolean,
+    examPercentage: number,
+    examPassed: boolean,
   ): string => {
-    if (passed) {
-      if (percentage >= 95) return "Outstanding performance! 🏆";
-      if (percentage >= 85) return "Excellent work! 🌟";
-      if (percentage >= 75) return "Great job! 👍";
-      return "Well done! ✅";
-    } else {
-      return "Keep practicing and you'll improve! 💪";
+    if (examPassed) {
+      if (examPercentage >= 95) return "Outstanding performance!";
+      if (examPercentage >= 85) return "Excellent work!";
+      if (examPercentage >= 75) return "Great job!";
+      return "Well done!";
     }
+    return "Keep practicing and you'll improve!";
   };
 
   const goHome = () => {
@@ -131,14 +160,39 @@ const ExamResult: React.FC = () => {
   };
 
   const retakeExam = () => {
-    history.push(`/exam/${examId}`);
+    if (examId) {
+      history.push(`/exam/${examId}`);
+      return;
+    }
+
+    history.push("/exams");
   };
 
   const viewAllExams = () => {
     history.push("/exams");
   };
 
-  if (!location.state) {
+  if (loading) {
+    return (
+      <IonPage>
+        <IonHeader>
+          <IonToolbar>
+            <IonButtons slot="start">
+              <IonBackButton defaultHref="/dashboard" />
+            </IonButtons>
+            <IonTitle>Exam Result</IonTitle>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent>
+          <div className="loading-container">
+            <IonSpinner name="crescent" />
+          </div>
+        </IonContent>
+      </IonPage>
+    );
+  }
+
+  if (loadError) {
     return (
       <IonPage>
         <IonHeader>
@@ -153,7 +207,7 @@ const ExamResult: React.FC = () => {
           <div className="empty-result">
             <IonIcon icon={documentTextOutline} />
             <h2>No exam result found</h2>
-            <p>Please take an exam to see your results here.</p>
+            <p>{loadError}</p>
             <IonButton fill="outline" onClick={viewAllExams}>
               Browse Exams
             </IonButton>
@@ -320,12 +374,13 @@ const ExamResult: React.FC = () => {
                             </div>
                           )}
 
-                          {!question.isCorrect && (
-                            <div className="answer-option correct">
-                              <strong>Correct answer:</strong>{" "}
-                              {question.options[question.correctAnswer]}
-                            </div>
-                          )}
+                          {!question.isCorrect &&
+                            question.correctAnswer !== undefined && (
+                              <div className="answer-option correct">
+                                <strong>Correct answer:</strong>{" "}
+                                {question.options[question.correctAnswer]}
+                              </div>
+                            )}
                         </div>
                       </div>
                     </IonItem>

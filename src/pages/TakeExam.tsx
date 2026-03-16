@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   IonButton,
   IonCard,
@@ -30,76 +30,45 @@ import {
   chevronForwardOutline,
   documentTextOutline,
 } from "ionicons/icons";
-import { useAuth } from "../contexts/AuthContext";
-import { examsAPI } from "../services/api";
+import { attemptsAPI, examsAPI } from "../services/api";
 import "./TakeExam.css";
+
+interface ExamOption {
+  _id?: string;
+  text: string;
+}
 
 interface ExamQuestion {
   id: string;
   text: string;
-  options: string[];
-  correctAnswer: number;
+  options: ExamOption[];
+}
+
+interface ExamInfo {
+  _id: string;
+  title: string;
+  description: string;
+  category: string;
+  duration: number;
+  totalMarks: number;
+  passingMarks: number;
+  instructions?: string;
 }
 
 const TakeExam: React.FC = () => {
   const { examId } = useParams<{ examId: string }>();
-  const { user } = useAuth();
   const history = useHistory();
 
-  const [exam, setExam] = useState<any>(null);
-  const [questions] = useState<ExamQuestion[]>([
-    {
-      id: "1",
-      text: "What is the correct syntax for creating a function in JavaScript?",
-      options: [
-        "function myFunction() {}",
-        "def myFunction() {}",
-        "function: myFunction() {}",
-        "create function myFunction() {}",
-      ],
-      correctAnswer: 0,
-    },
-    {
-      id: "2",
-      text: "Which method is used to add an element to the end of an array?",
-      options: ["append()", "push()", "add()", "insert()"],
-      correctAnswer: 1,
-    },
-    {
-      id: "3",
-      text: 'What does "DOM" stand for?',
-      options: [
-        "Document Object Model",
-        "Data Object Management",
-        "Dynamic Object Manipulation",
-        "Digital Output Method",
-      ],
-      correctAnswer: 0,
-    },
-    {
-      id: "4",
-      text: "Which operator is used for strict equality comparison in JavaScript?",
-      options: ["==", "===", "=", "!="],
-      correctAnswer: 1,
-    },
-    {
-      id: "5",
-      text: 'What is the purpose of the "var" keyword in JavaScript?',
-      options: [
-        "To create a variable",
-        "To create a function",
-        "To create an object",
-        "To create a loop",
-      ],
-      correctAnswer: 0,
-    },
-  ]);
+  const [exam, setExam] = useState<ExamInfo | null>(null);
+  const [questions, setQuestions] = useState<ExamQuestion[]>([]);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [timeRemaining, setTimeRemaining] = useState(30 * 60); // 30 minutes in seconds
+  const [timeRemaining, setTimeRemaining] = useState(30 * 60);
   const [showSubmitAlert, setShowSubmitAlert] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [examStarted, setExamStarted] = useState(false);
@@ -109,33 +78,56 @@ const TakeExam: React.FC = () => {
   }, [examId]);
 
   useEffect(() => {
-    if (examStarted && timeRemaining > 0) {
-      const timer = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            handleSubmitExam();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
+    if (!examStarted || timeRemaining <= 0 || submitting) {
+      return;
     }
-  }, [examStarted, timeRemaining]);
+
+    const timer = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          void handleSubmitExam(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [examStarted, timeRemaining, submitting]);
+
+  const getPassingPercentage = useCallback((examData: ExamInfo | null) => {
+    if (!examData || !examData.totalMarks) {
+      return 70;
+    }
+
+    return Math.round((examData.passingMarks / examData.totalMarks) * 100);
+  }, []);
 
   const loadExam = async () => {
     setLoading(true);
     try {
-      const response = await examsAPI.getExam(examId!);
-      if (response.success && response.data) {
-        setExam(response.data);
-        setTimeRemaining(response.data.timeLimit * 60); // Convert minutes to seconds
+      const response = await examsAPI.getExam(examId);
+      const examData = response.data?.data ?? response.data;
+
+      if (response.success && examData) {
+        const normalizedExam: ExamInfo = {
+          _id: examData._id,
+          title: examData.title,
+          description: examData.description,
+          category: examData.category,
+          duration: examData.duration,
+          totalMarks: examData.totalMarks,
+          passingMarks: examData.passingMarks,
+          instructions: examData.instructions,
+        };
+
+        setExam(normalizedExam);
+        setTimeRemaining((normalizedExam.duration || 30) * 60);
       } else {
         setToastMessage("Failed to load exam");
         setShowToast(true);
       }
-    } catch (error) {
+    } catch {
       setToastMessage("Failed to load exam");
       setShowToast(true);
     } finally {
@@ -143,15 +135,96 @@ const TakeExam: React.FC = () => {
     }
   };
 
-  const startExam = () => {
-    setExamStarted(true);
+  const startExam = async () => {
+    try {
+      const response = await attemptsAPI.startAttempt(examId);
+      const attemptData = response.data?.data ?? response.data;
+
+      if (!response.success || !attemptData) {
+        setToastMessage("Unable to start exam attempt");
+        setShowToast(true);
+        return;
+      }
+
+      const resolvedExam = attemptData.exam || exam;
+      if (resolvedExam) {
+        setExam((prev) => ({
+          _id: resolvedExam._id || prev?._id || examId,
+          title: resolvedExam.title || prev?.title || "Exam",
+          description: resolvedExam.description || prev?.description || "",
+          category: resolvedExam.category || prev?.category || "General",
+          duration: resolvedExam.duration || prev?.duration || 30,
+          totalMarks: resolvedExam.totalMarks || prev?.totalMarks || 0,
+          passingMarks: resolvedExam.passingMarks || prev?.passingMarks || 0,
+          instructions: resolvedExam.instructions || prev?.instructions,
+        }));
+      }
+
+      const mappedQuestions: ExamQuestion[] = (attemptData.answers || [])
+        .map((answer: any) => {
+          const q = answer.question;
+          if (!q) return null;
+
+          return {
+            id: q._id || q.id,
+            text: q.text,
+            options: (q.options || []).map((option: any) =>
+              typeof option === "string"
+                ? { text: option }
+                : { _id: option._id, text: option.text },
+            ),
+          };
+        })
+        .filter(Boolean);
+
+      const initialAnswers: Record<string, number> = {};
+      (attemptData.answers || []).forEach((answer: any) => {
+        const questionId = answer.question?._id || answer.question?.id;
+        if (questionId && typeof answer.selectedOption === "number") {
+          initialAnswers[questionId] = answer.selectedOption;
+        }
+      });
+
+      setAttemptId(attemptData._id || attemptData.id);
+      setQuestions(mappedQuestions);
+      setAnswers(initialAnswers);
+      setTimeRemaining(
+        attemptData.timeRemaining ||
+          (resolvedExam?.duration || exam?.duration || 30) * 60,
+      );
+      setCurrentQuestion(0);
+      setExamStarted(true);
+    } catch (error: any) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to start exam";
+      setToastMessage(message);
+      setShowToast(true);
+    }
   };
 
-  const handleAnswerChange = (questionId: string, answerIndex: number) => {
+  const handleAnswerChange = async (
+    questionId: string,
+    answerIndex: number,
+  ) => {
     setAnswers((prev) => ({
       ...prev,
       [questionId]: answerIndex,
     }));
+
+    if (!attemptId) {
+      return;
+    }
+
+    try {
+      await attemptsAPI.saveAnswer(attemptId, questionId, {
+        selectedOption: answerIndex,
+      });
+    } catch {
+      setToastMessage("Answer was saved locally but sync failed");
+      setShowToast(true);
+    }
   };
 
   const nextQuestion = () => {
@@ -166,31 +239,46 @@ const TakeExam: React.FC = () => {
     }
   };
 
-  const handleSubmitExam = () => {
-    // Calculate score
-    let correctAnswers = 0;
-    questions.forEach((question) => {
-      if (answers[question.id] === question.correctAnswer) {
-        correctAnswers++;
-      }
-    });
+  const handleSubmitExam = async (isAutoSubmit = false) => {
+    if (!attemptId || submitting) {
+      return;
+    }
 
-    const percentage = Math.round((correctAnswers / questions.length) * 100);
-    const passed = percentage >= (exam?.passingScore || 70);
+    setSubmitting(true);
+    try {
+      await Promise.all(
+        Object.entries(answers).map(([questionId, selectedOption]) =>
+          attemptsAPI.saveAnswer(attemptId, questionId, { selectedOption }),
+        ),
+      );
 
-    // Navigate to results page with score data
-    history.push({
-      pathname: `/result/${examId}`,
-      state: {
-        examTitle: exam?.title,
-        score: correctAnswers,
-        totalQuestions: questions.length,
-        percentage,
-        passed,
-        answers: answers,
-        questions: questions,
-      },
-    });
+      const submitResponse = await attemptsAPI.submitAttempt(attemptId);
+      const submitData = submitResponse.data?.data ?? submitResponse.data;
+      const scoreData = submitData?.score || {};
+      const resultData = submitData?.result || {};
+
+      history.replace({
+        pathname: `/result/${attemptId}`,
+        state: {
+          examId,
+          examTitle: submitData?.examTitle || exam?.title || "Exam",
+          score: scoreData.obtained || 0,
+          totalQuestions: questions.length,
+          percentage: scoreData.percentage || 0,
+          passed: !!resultData.passed,
+          autoSubmitted: isAutoSubmit,
+        },
+      });
+    } catch (error: any) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to submit exam";
+      setToastMessage(message);
+      setShowToast(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const formatTime = (seconds: number): string => {
@@ -202,6 +290,10 @@ const TakeExam: React.FC = () => {
   const getAnsweredCount = (): number => {
     return Object.keys(answers).length;
   };
+
+  const currentQ = questions[currentQuestion];
+  const progress =
+    questions.length > 0 ? ((currentQuestion + 1) / questions.length) * 100 : 0;
 
   if (loading) {
     return (
@@ -249,15 +341,15 @@ const TakeExam: React.FC = () => {
                 <div className="exam-details">
                   <div className="detail-row">
                     <span className="label">Duration:</span>
-                    <span className="value">{exam?.timeLimit} minutes</span>
+                    <span className="value">{exam?.duration} minutes</span>
                   </div>
                   <div className="detail-row">
                     <span className="label">Questions:</span>
-                    <span className="value">{questions.length}</span>
+                    <span className="value">{questions.length || "Will load on start"}</span>
                   </div>
                   <div className="detail-row">
                     <span className="label">Passing Score:</span>
-                    <span className="value">{exam?.passingScore}%</span>
+                    <span className="value">{getPassingPercentage(exam)}%</span>
                   </div>
                   <div className="detail-row">
                     <span className="label">Category:</span>
@@ -268,11 +360,17 @@ const TakeExam: React.FC = () => {
                 <div className="exam-instructions">
                   <h3>Instructions:</h3>
                   <ul>
-                    <li>Read each question carefully</li>
-                    <li>Select the best answer for each question</li>
-                    <li>You can navigate between questions</li>
-                    <li>Click "Submit Exam" when you're finished</li>
-                    <li>The exam will auto-submit when time expires</li>
+                    {exam?.instructions ? (
+                      <li>{exam.instructions}</li>
+                    ) : (
+                      <>
+                        <li>Read each question carefully</li>
+                        <li>Select the best answer for each question</li>
+                        <li>You can navigate between questions</li>
+                        <li>Click "Submit Exam" when you&apos;re finished</li>
+                        <li>The exam will auto-submit when time expires</li>
+                      </>
+                    )}
                   </ul>
                 </div>
 
@@ -292,8 +390,25 @@ const TakeExam: React.FC = () => {
     );
   }
 
-  const currentQ = questions[currentQuestion];
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  if (!currentQ) {
+    return (
+      <IonPage>
+        <IonHeader>
+          <IonToolbar>
+            <IonButtons slot="start">
+              <IonBackButton defaultHref="/exams" />
+            </IonButtons>
+            <IonTitle>{exam?.title}</IonTitle>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent>
+          <div className="loading-container">
+            <IonText>No questions were found for this attempt.</IonText>
+          </div>
+        </IonContent>
+      </IonPage>
+    );
+  }
 
   return (
     <IonPage>
@@ -336,13 +451,13 @@ const TakeExam: React.FC = () => {
               <IonRadioGroup
                 value={answers[currentQ.id]}
                 onIonChange={(e) =>
-                  handleAnswerChange(currentQ.id, e.detail.value)
+                  void handleAnswerChange(currentQ.id, e.detail.value)
                 }
               >
                 {currentQ.options.map((option, index) => (
-                  <IonItem key={index} className="option-item">
+                  <IonItem key={option._id || index} className="option-item">
                     <IonRadio slot="start" value={index} />
-                    <IonLabel className="option-label">{option}</IonLabel>
+                    <IonLabel className="option-label">{option.text}</IonLabel>
                   </IonItem>
                 ))}
               </IonRadioGroup>
@@ -355,19 +470,23 @@ const TakeExam: React.FC = () => {
           <IonButton
             fill="outline"
             onClick={previousQuestion}
-            disabled={currentQuestion === 0}
+            disabled={currentQuestion === 0 || submitting}
           >
             <IonIcon icon={chevronBackOutline} slot="start" />
             Previous
           </IonButton>
 
           {currentQuestion === questions.length - 1 ? (
-            <IonButton color="success" onClick={() => setShowSubmitAlert(true)}>
+            <IonButton
+              color="success"
+              onClick={() => setShowSubmitAlert(true)}
+              disabled={submitting}
+            >
               <IonIcon icon={checkmarkOutline} slot="start" />
-              Submit Exam
+              {submitting ? "Submitting..." : "Submit Exam"}
             </IonButton>
           ) : (
-            <IonButton onClick={nextQuestion}>
+            <IonButton onClick={nextQuestion} disabled={submitting}>
               Next
               <IonIcon icon={chevronForwardOutline} slot="end" />
             </IonButton>
@@ -387,7 +506,9 @@ const TakeExam: React.FC = () => {
             },
             {
               text: "Submit",
-              handler: handleSubmitExam,
+              handler: () => {
+                void handleSubmitExam(false);
+              },
             },
           ]}
         />

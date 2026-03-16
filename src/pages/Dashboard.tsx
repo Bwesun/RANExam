@@ -15,7 +15,6 @@ import {
   IonCol,
   IonIcon,
   IonItem,
-  IonLabel,
   IonList,
   IonButtons,
   IonMenuButton,
@@ -41,7 +40,7 @@ import {
 } from "ionicons/icons";
 import { useAuth } from "../contexts/AuthContext";
 import { useHistory } from "react-router-dom";
-import { examsAPI, resultsAPI, adminAPI } from "../services/api";
+import { examsAPI, attemptsAPI, adminAPI } from "../services/api";
 import "./Dashboard.css";
 
 interface DashboardStats {
@@ -57,9 +56,9 @@ interface ExamData {
   description: string;
   category: string;
   difficulty: string;
-  timeLimit: number;
-  passingScore: number;
-  totalQuestions: number;
+  duration: number;
+  questionCount?: number;
+  passPercentage?: number;
   isActive: boolean;
   createdAt: string;
 }
@@ -67,14 +66,22 @@ interface ExamData {
 interface ResultData {
   _id: string;
   exam: {
+    _id: string;
     title: string;
     category: string;
+    totalMarks: number;
+    passingMarks: number;
   };
-  score: number;
-  totalQuestions: number;
-  percentage: number;
-  passed: boolean;
-  completedAt: string;
+  score: {
+    obtained: number;
+    total: number;
+    percentage: number;
+  };
+  result: {
+    passed: boolean;
+    grade?: string;
+  };
+  createdAt: string;
 }
 
 const Dashboard: React.FC = () => {
@@ -122,7 +129,9 @@ const Dashboard: React.FC = () => {
       });
 
       if (response.success && response.data) {
-        setAvailableExams(response.data.exams || []);
+        const rawData = response.data;
+        const exams = Array.isArray(rawData) ? rawData : (rawData.data ?? []);
+        setAvailableExams(exams);
       }
     } catch (error) {
       console.error("Failed to load exams:", error);
@@ -132,13 +141,18 @@ const Dashboard: React.FC = () => {
   const loadRecentResults = async () => {
     try {
       if (user?.role === "student") {
-        const response = await resultsAPI.getUserResults({
+        const response = await attemptsAPI.getUserAttempts({
           page: 1,
           limit: 5,
+          status: "completed",
         });
 
         if (response.success && response.data) {
-          setRecentResults(response.data.results || []);
+          const rawData = response.data;
+          const results = Array.isArray(rawData)
+            ? rawData
+            : (rawData.data ?? []);
+          setRecentResults(results);
         }
       }
     } catch (error) {
@@ -151,16 +165,26 @@ const Dashboard: React.FC = () => {
       if (user?.role === "admin") {
         const response = await adminAPI.getDashboardStats();
         if (response.success && response.data) {
-          setDashboardStats(response.data);
+          const overview = response.data.overview || {};
+          setDashboardStats({
+            totalExams: overview.totalExams || 0,
+            completedExams: overview.completedAttempts || 0,
+            averageScore: 0,
+            passedExams: 0,
+          });
         }
       } else if (user?.role === "student") {
-        const response = await resultsAPI.getUserResults({
+        const response = await attemptsAPI.getUserAttempts({
           page: 1,
           limit: 100,
+          status: "completed",
         });
 
         if (response.success && response.data) {
-          const results = response.data.results || [];
+          const rawData = response.data;
+          const results = Array.isArray(rawData)
+            ? rawData
+            : (rawData.data ?? []);
           const stats = {
             totalExams: results.length,
             completedExams: results.length,
@@ -168,12 +192,14 @@ const Dashboard: React.FC = () => {
               results.length > 0
                 ? Math.round(
                     results.reduce(
-                      (acc: number, result: any) => acc + result.percentage,
+                      (acc: number, result: ResultData) =>
+                        acc + (result.score?.percentage || 0),
                       0,
                     ) / results.length,
                   )
                 : 0,
-            passedExams: results.filter((result: any) => result.passed).length,
+            passedExams: results.filter((result: ResultData) => result.result?.passed)
+              .length,
           };
           setDashboardStats(stats);
         }
@@ -391,10 +417,10 @@ const Dashboard: React.FC = () => {
                         <span className="category">{exam.category}</span>
                         <span className="duration">
                           <IonIcon icon={timeOutline} />
-                          {formatDuration(exam.timeLimit)}
+                          {formatDuration(exam.duration)}
                         </span>
                         <span className="questions">
-                          {exam.totalQuestions} questions
+                          {exam.questionCount ?? 0} questions
                         </span>
                       </div>
                     </div>
@@ -444,8 +470,10 @@ const Dashboard: React.FC = () => {
                       <div className="result-item-content">
                         <div className="result-header">
                           <h4>{result.exam.title}</h4>
-                          <IonBadge color={getGradeColor(result.percentage)}>
-                            {result.percentage}%
+                          <IonBadge
+                            color={getGradeColor(result.score?.percentage || 0)}
+                          >
+                            {result.score?.percentage || 0}%
                           </IonBadge>
                         </div>
                         <div className="result-meta">
@@ -453,23 +481,29 @@ const Dashboard: React.FC = () => {
                             {result.exam.category}
                           </span>
                           <span className="score">
-                            {result.score}/{result.totalQuestions} correct
+                            {result.score?.obtained || 0}/{result.score?.total || 0}
+                            {" "}
+                            correct
                           </span>
                           <span className="date">
-                            {formatDate(result.completedAt)}
+                            {formatDate(result.createdAt)}
                           </span>
                         </div>
                         <div className="result-status">
                           <IonIcon
                             icon={
-                              result.passed
+                              result.result?.passed
                                 ? checkmarkCircleOutline
                                 : timeOutline
                             }
-                            color={result.passed ? "success" : "danger"}
+                            color={result.result?.passed ? "success" : "danger"}
                           />
-                          <span className={result.passed ? "passed" : "failed"}>
-                            {result.passed ? "Passed" : "Failed"}
+                          <span
+                            className={
+                              result.result?.passed ? "passed" : "failed"
+                            }
+                          >
+                            {result.result?.passed ? "Passed" : "Failed"}
                           </span>
                         </div>
                       </div>

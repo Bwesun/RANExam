@@ -43,16 +43,18 @@ import {
   pencilOutline,
   reorderThreeOutline,
   copyOutline,
-  eyeOutline,
   closeOutline,
   checkmarkOutline,
 } from "ionicons/icons";
 import { useHistory } from "react-router-dom";
-import { Exam, Question } from "../types/exam";
+import { Question } from "../types/exam";
 import "./CreateExam.css";
-import axios from "axios";
-import { useAuth } from "../contexts/AuthContext";
-import { examsAPI, CreateExamRequest } from "../services/api";
+import {
+  examsAPI,
+  CreateExamRequest,
+  CreateQuestionRequest,
+  questionsAPI,
+} from "../services/api";
 
 interface ExamForm {
   title: string;
@@ -81,7 +83,6 @@ interface QuestionForm {
 
 const CreateExam: React.FC = () => {
   const history = useHistory();
-  const {user} = useAuth();
   const [currentStep, setCurrentStep] = useState<
     "basic" | "questions" | "settings" | "preview"
   >("basic");
@@ -294,53 +295,104 @@ const CreateExam: React.FC = () => {
       return false;
     }
 
+    const marksPerQuestion = examForm.totalMarks / questions.length;
+    if (marksPerQuestion < 0.5 || marksPerQuestion > 10) {
+      setToastMessage(
+        "Total marks must allow each question mark to stay between 0.5 and 10",
+      );
+      setShowToast(true);
+      return false;
+    }
+
     return true;
   };
 
   const saveExam = async () => {
-  if (!validateExam()) return;
+    if (!validateExam()) return;
 
-  const newExam: Exam = {
-    id: Date.now().toString(),
-    title: examForm.title,
-    description: examForm.description,
-    category: examForm.category,
-    duration: examForm.duration,
-    questions: questions,
-    totalMarks: examForm.totalMarks,
-    passingMarks: examForm.passingMarks,
-    isActive: true,
-    createdBy: user?.id || "",
-    createdAt: new Date(),
+    const marksPerQuestion = Number(
+      (examForm.totalMarks / questions.length).toFixed(2),
+    );
+
+    try {
+      const createdQuestionIds = await Promise.all(
+        questions.map(async (question) => {
+          const questionPayload: CreateQuestionRequest = {
+            text: question.text,
+            type: "multiple-choice",
+            options: question.options.map((optionText, index) => ({
+              text: optionText,
+              isCorrect: index === question.correctAnswer,
+            })),
+            explanation: question.explanation,
+            difficulty: question.difficulty,
+            category: question.category,
+            marks: marksPerQuestion,
+          };
+
+          const createdQuestion = await questionsAPI.createQuestion(
+            questionPayload,
+          );
+          const questionData = createdQuestion.data?.data ?? createdQuestion.data;
+          const questionId = questionData?._id || questionData?.id;
+
+          if (!createdQuestion.success || !questionId) {
+            throw new Error("Question creation failed");
+          }
+
+          return questionId;
+        }),
+      );
+
+      const schedule: CreateExamRequest["schedule"] = {};
+      if (examForm.scheduledStart && typeof examForm.scheduledStart === "string") {
+        schedule.startDate = examForm.scheduledStart;
+      }
+      if (examForm.scheduledEnd && typeof examForm.scheduledEnd === "string") {
+        schedule.endDate = examForm.scheduledEnd;
+      }
+
+      const createReq: CreateExamRequest = {
+        title: examForm.title,
+        description: examForm.description,
+        category: examForm.category,
+        duration: examForm.duration,
+        totalMarks: examForm.totalMarks,
+        passingMarks: examForm.passingMarks,
+        instructions: examForm.instructions,
+        questions: createdQuestionIds,
+        isActive: true,
+        status: "published",
+        difficulty: "intermediate",
+        schedule,
+        settings: {
+          randomizeQuestions: examForm.randomizeQuestions,
+          showResults: examForm.showResults,
+          showCorrectAnswers: examForm.showResults,
+          allowReview: true,
+          maxAttempts: examForm.maxAttempts,
+        },
+      };
+
+      const response = await examsAPI.createExam(createReq);
+      if (response.success) {
+        setToastMessage("Exam created successfully!");
+        setShowToast(true);
+        setTimeout(() => history.push("/dashboard"), 1200);
+      } else {
+        setToastMessage(response.message || "Error creating exam.");
+        setShowToast(true);
+      }
+    } catch (error: any) {
+      console.error("Error creating exam:", error);
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        "Error creating exam.";
+      setToastMessage(message);
+      setShowToast(true);
+    }
   };
-
-  // Map UI model (Exam) -> API model (CreateExamRequest)
-  const createReq: CreateExamRequest = {
-    ...newExam,
-    title: newExam.title,
-    description: newExam.description,
-    category: newExam.category,
-    difficulty: "intermediate",
-    timeLimit: newExam.duration ?? 60,
-    passingScore: newExam.passingMarks ?? Math.round(newExam.totalMarks * 0.5),
-    instructions: examForm.instructions,
-    isActive: newExam.isActive,
-    // tags: examForm.tags,
-    // settings: examForm.settings,
-  };
-
-  try {
-    const response = await examsAPI.createExam(createReq);
-    console.log("Exam created:", response);
-    setToastMessage("Exam created successfully!");
-    setShowToast(true);
-    setTimeout(() => history.push("/dashboard"), 2000);
-  } catch (error) {
-    console.error("Error creating exam:", error);
-    setToastMessage("Error creating exam.");
-    setShowToast(true);
-  }
-};
 
   const renderBasicInfo = () => (
     <div className="step-content">

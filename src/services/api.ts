@@ -1,11 +1,4 @@
 import axios, { AxiosResponse } from "axios";
-import {
-  USE_MOCK_API,
-  mockAuthAPI,
-  mockExamsAPI,
-  mockResultsAPI,
-  mockAdminAPI,
-} from "./mockApi";
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -91,36 +84,46 @@ export interface ChangePasswordRequest {
 
 export interface CreateExamRequest {
   title: string;
-  description: string;
+  description?: string;
   category: string;
-  difficulty: "beginner" | "intermediate" | "advanced" | "expert";
-  timeLimit: number;
-  passingScore: number;
+  duration: number;
+  totalMarks: number;
+  passingMarks: number;
+  questions: string[];
   instructions?: string;
   isActive?: boolean;
+  status?: "draft" | "published" | "archived" | "suspended";
+  difficulty?: "beginner" | "intermediate" | "advanced" | "expert";
   tags?: string[];
   schedule?: {
-    startDate?: Date;
-    endDate?: Date;
+    startDate?: Date | string;
+    endDate?: Date | string;
   };
   settings?: {
-    shuffleQuestions?: boolean;
-    shuffleOptions?: boolean;
+    randomizeQuestions?: boolean;
+    randomizeOptions?: boolean;
     allowReview?: boolean;
     showResults?: boolean;
+    showCorrectAnswers?: boolean;
     maxAttempts?: number;
   };
 }
 
+export interface QuestionOptionInput {
+  text: string;
+  isCorrect: boolean;
+  explanation?: string;
+}
+
 export interface CreateQuestionRequest {
   text: string;
-  type: "multiple-choice" | "true-false" | "short-answer";
-  options: string[];
-  correctAnswer: number | string;
+  type: "multiple-choice" | "true-false" | "fill-blank" | "essay";
+  options: QuestionOptionInput[];
+  correctAnswer?: number;
   explanation?: string;
   difficulty: "easy" | "medium" | "hard";
   category: string;
-  points: number;
+  marks?: number;
   tags?: string[];
 }
 
@@ -134,7 +137,6 @@ export const authAPI = {
       "/auth/login",
       data,
     );
-    console.log("API Response:", response.data);
     return response.data;
   },
 
@@ -248,7 +250,6 @@ export const examsAPI = {
       "/exams",
       data,
     );
-    console.log("Create Exam Response:", response.data, "Data Sent:", data);
     return response.data;
   },
 
@@ -272,7 +273,7 @@ export const examsAPI = {
 
   getExamStats: async (examId: string): Promise<ApiResponse<any>> => {
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
-      `/exams/${examId}/stats`,
+      `/exams/${examId}/analytics`,
     );
     return response.data;
   },
@@ -335,7 +336,7 @@ export const questionsAPI = {
     questionId: string,
   ): Promise<ApiResponse<any>> => {
     const response: AxiosResponse<ApiResponse<any>> = await api.post(
-      `/questions/${questionId}/add-to-exam/${examId}`,
+      `/exams/${examId}/questions/${questionId}`,
     );
     return response.data;
   },
@@ -345,7 +346,7 @@ export const questionsAPI = {
     questionId: string,
   ): Promise<ApiResponse<any>> => {
     const response: AxiosResponse<ApiResponse<any>> = await api.delete(
-      `/questions/${questionId}/remove-from-exam/${examId}`,
+      `/exams/${examId}/questions/${questionId}`,
     );
     return response.data;
   },
@@ -355,14 +356,22 @@ export const questionsAPI = {
 export const attemptsAPI = {
   startAttempt: async (examId: string): Promise<ApiResponse<any>> => {
     const response: AxiosResponse<ApiResponse<any>> = await api.post(
-      `/attempts/start/${examId}`,
+      "/attempts/start",
+      { examId },
+    );
+    return response.data;
+  },
+
+  getCurrentAttempt: async (examId: string): Promise<ApiResponse<any>> => {
+    const response: AxiosResponse<ApiResponse<any>> = await api.get(
+      `/attempts/current/${examId}`,
     );
     return response.data;
   },
 
   getAttempt: async (attemptId: string): Promise<ApiResponse<any>> => {
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
-      `/attempts/${attemptId}`,
+      `/attempts/${attemptId}/result`,
     );
     return response.data;
   },
@@ -370,13 +379,17 @@ export const attemptsAPI = {
   saveAnswer: async (
     attemptId: string,
     questionId: string,
-    answer: any,
+    answer: {
+      selectedOption?: number;
+      textAnswer?: string;
+      timeSpent?: number;
+    },
   ): Promise<ApiResponse<any>> => {
     const response: AxiosResponse<ApiResponse<any>> = await api.put(
       `/attempts/${attemptId}/answer`,
       {
         questionId,
-        answer,
+        ...answer,
       },
     );
     return response.data;
@@ -396,8 +409,15 @@ export const attemptsAPI = {
     status?: string;
   }): Promise<ApiResponse<any>> => {
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
-      "/attempts",
+      "/attempts/my-attempts",
       { params },
+    );
+    return response.data;
+  },
+
+  getAttemptResult: async (attemptId: string): Promise<ApiResponse<any>> => {
+    const response: AxiosResponse<ApiResponse<any>> = await api.get(
+      `/attempts/${attemptId}/result`,
     );
     return response.data;
   },
@@ -439,7 +459,7 @@ export const resultsAPI = {
     },
   ): Promise<ApiResponse<any>> => {
     const response: AxiosResponse<ApiResponse<any>> = await api.get(
-      `/results/exam/${examId}`,
+      `/attempts/exam/${examId}`,
       { params },
     );
     return response.data;

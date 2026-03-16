@@ -266,6 +266,14 @@ router.post(
     body("questions")
       .isArray({ min: 1 })
       .withMessage("At least one question is required"),
+    body("status")
+      .optional()
+      .isIn(["draft", "published", "archived", "suspended"])
+      .withMessage("Invalid status"),
+    body("isActive")
+      .optional()
+      .isBoolean()
+      .withMessage("isActive must be boolean"),
   ],
   async (req, res) => {
     try {
@@ -292,6 +300,8 @@ router.post(
         tags,
         difficulty,
         estimatedTime,
+        status,
+        isActive,
       } = req.body;
 
       // Validate that passing marks don't exceed total marks
@@ -330,6 +340,8 @@ router.post(
         tags: tags || [],
         difficulty: difficulty || "intermediate",
         estimatedTime: estimatedTime || duration,
+        isActive: isActive !== undefined ? isActive : true,
+        status: status || "published",
         createdBy: req.user.id,
       });
 
@@ -553,6 +565,115 @@ router.delete("/:id", async (req, res) => {
     });
   }
 });
+
+// @desc    Add question to exam
+// @route   POST /api/exams/:id/questions/:questionId
+// @access  Private (Creator/Admin)
+router.post(
+  "/:id/questions/:questionId",
+  authorize("instructor", "admin"),
+  async (req, res) => {
+    try {
+      const exam = await Exam.findById(req.params.id);
+      if (!exam) {
+        return res.status(404).json({
+          success: false,
+          message: "Exam not found",
+        });
+      }
+
+      if (
+        req.user.role !== "admin" &&
+        exam.createdBy.toString() !== req.user.id
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to update this exam",
+        });
+      }
+
+      const question = await Question.findOne({
+        _id: req.params.questionId,
+        status: "approved",
+      });
+
+      if (!question) {
+        return res.status(404).json({
+          success: false,
+          message: "Question not found or not approved",
+        });
+      }
+
+      const alreadyExists = exam.questions.some(
+        (questionId) => questionId.toString() === req.params.questionId,
+      );
+
+      if (!alreadyExists) {
+        exam.questions.push(req.params.questionId);
+      }
+
+      await exam.save();
+
+      res.status(200).json({
+        success: true,
+        message: alreadyExists
+          ? "Question already exists in exam"
+          : "Question added to exam",
+      });
+    } catch (error) {
+      console.error("Add question to exam error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error during exam update",
+      });
+    }
+  },
+);
+
+// @desc    Remove question from exam
+// @route   DELETE /api/exams/:id/questions/:questionId
+// @access  Private (Creator/Admin)
+router.delete(
+  "/:id/questions/:questionId",
+  authorize("instructor", "admin"),
+  async (req, res) => {
+    try {
+      const exam = await Exam.findById(req.params.id);
+      if (!exam) {
+        return res.status(404).json({
+          success: false,
+          message: "Exam not found",
+        });
+      }
+
+      if (
+        req.user.role !== "admin" &&
+        exam.createdBy.toString() !== req.user.id
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to update this exam",
+        });
+      }
+
+      exam.questions = exam.questions.filter(
+        (questionId) => questionId.toString() !== req.params.questionId,
+      );
+      await exam.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Question removed from exam",
+      });
+    } catch (error) {
+      console.error("Remove question from exam error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error during exam update",
+      });
+    }
+  },
+);
 
 // @desc    Get exam analytics
 // @route   GET /api/exams/:id/analytics
