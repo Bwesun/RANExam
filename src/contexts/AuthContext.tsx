@@ -179,6 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         };
       }
     } catch (error: any) {
+      console.log("Registration failed. Data:", error);
       console.error("Registration failed:", error);
       const message =
         error.response?.data?.message || error.message || "Registration failed";

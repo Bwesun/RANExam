@@ -148,6 +148,7 @@ export const authAPI = {
       "/auth/register",
       data,
     );
+    console.log("Register response: ", response.data);
     return response.data;
   },
 
