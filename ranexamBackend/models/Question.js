@@ -243,6 +243,17 @@ questionSchema.virtual("optionCount").get(function () {
   return this.options ? this.options.length : 0;
 });
 
+// Pre-validate: auto-derive correctAnswer before Mongoose runs required-field checks
+questionSchema.pre("validate", function (next) {
+  if (this.type === "multiple-choice" || this.type === "true-false") {
+    const correctIndex = this.options.findIndex((option) => option.isCorrect);
+    if (correctIndex !== -1) {
+      this.correctAnswer = correctIndex;
+    }
+  }
+  next();
+});
+
 // Pre-save validation
 questionSchema.pre("save", function (next) {
   // Validate that only one option is marked as correct for multiple choice
@@ -255,9 +266,6 @@ questionSchema.pre("save", function (next) {
         ),
       );
     }
-
-    // Set correctAnswer index
-    this.correctAnswer = this.options.findIndex((option) => option.isCorrect);
   }
 
   // Validate minimum options for multiple choice
