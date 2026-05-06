@@ -30,6 +30,7 @@ router.get(
       .withMessage("Invalid role"),
     query("isActive")
       .optional()
+      .toBoolean()
       .isBoolean()
       .withMessage("isActive must be boolean"),
     query("sortBy")

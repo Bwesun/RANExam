@@ -498,9 +498,50 @@ export const usersAPI = {
     return response.data;
   },
 
+  createUser: async (data: {
+    name: string;
+    email: string;
+    password: string;
+    role: "student" | "instructor" | "admin";
+    department?: string;
+    phoneNumber?: string;
+    address?: string;
+    emergencyContact?: string;
+    permissions?: string[];
+    notes?: string;
+  }): Promise<ApiResponse<any>> => {
+    const response: AxiosResponse<ApiResponse<any>> = await api.post(
+      "/users",
+      data,
+    );
+    return response.data;
+  },
+
   deleteUser: async (userId: string): Promise<ApiResponse<any>> => {
     const response: AxiosResponse<ApiResponse<any>> = await api.delete(
       `/users/${userId}`,
+    );
+    return response.data;
+  },
+
+  getUserStats: async (userId: string): Promise<ApiResponse<any>> => {
+    const response: AxiosResponse<ApiResponse<any>> = await api.get(
+      `/users/${userId}/stats`,
+    );
+    return response.data;
+  },
+
+  resetUserPassword: async (userId: string): Promise<ApiResponse<any>> => {
+    const response: AxiosResponse<ApiResponse<any>> = await api.post(
+      `/users/${userId}/reset-password`,
+    );
+    return response.data;
+  },
+
+  bulkUserAction: async (action: "activate" | "deactivate" | "delete", userIds: string[]): Promise<ApiResponse<any>> => {
+    const response: AxiosResponse<ApiResponse<any>> = await api.post(
+      "/users/bulk",
+      { action, userIds },
     );
     return response.data;
   },

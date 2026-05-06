@@ -57,7 +57,9 @@ import {
   funnelOutline,
 } from "ionicons/icons";
 import { User } from "../types/exam";
+import { usersAPI } from "../services/api";
 import "./UserManagement.css";
+
 
 interface UserForm {
   name: string;
@@ -103,6 +105,8 @@ const UserManagement: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
 
+  const [loading, setLoading] = useState(false);
+
   const [userForm, setUserForm] = useState<UserForm>({
     name: "",
     email: "",
@@ -114,62 +118,37 @@ const UserManagement: React.FC = () => {
   });
 
   useEffect(() => {
-    // Mock user data
-    const mockUsers = [
-      {
-        id: "1",
-        name: "John Doe",
-        email: "john.doe@example.com",
-        role: "student" as const,
-        isActive: true,
-        department: "Computer Science",
-        joinDate: "2023-09-15",
-        lastLogin: "2024-01-15T10:30:00Z",
-      },
-      {
-        id: "2",
-        name: "Jane Smith",
-        email: "jane.smith@example.com",
-        role: "instructor" as const,
-        isActive: true,
-        department: "Software Engineering",
-        joinDate: "2022-08-20",
-        lastLogin: "2024-01-14T15:45:00Z",
-      },
-      {
-        id: "3",
-        name: "Mike Johnson",
-        email: "mike.johnson@example.com",
-        role: "student" as const,
-        isActive: false,
-        department: "Information Technology",
-        joinDate: "2023-10-05",
-        lastLogin: "2023-12-20T09:15:00Z",
-      },
-      {
-        id: "4",
-        name: "Sarah Wilson",
-        email: "sarah.wilson@example.com",
-        role: "admin" as const,
-        isActive: true,
-        department: "Administration",
-        joinDate: "2021-03-10",
-        lastLogin: "2024-01-15T08:20:00Z",
-      },
-      {
-        id: "5",
-        name: "David Brown",
-        email: "david.brown@example.com",
-        role: "instructor" as const,
-        isActive: true,
-        department: "Database Systems",
-        joinDate: "2022-01-15",
-        lastLogin: "2024-01-13T14:10:00Z",
-      },
-    ];
-
-    setUsers(mockUsers);
+    loadUsers();
   }, []);
+
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const response = await usersAPI.getUsers({ limit: 100 });
+      if (response.success && response.data) {
+        const rawData = response.data;
+        const userList = Array.isArray(rawData) ? rawData : (rawData.data ?? []);
+        const mappedUsers = userList.map((u: any) => ({
+          id: u._id || u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role as "student" | "instructor" | "admin",
+          isActive: u.isActive,
+          department: u.department,
+          joinDate: u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : '',
+          lastLogin: u.lastLogin,
+        }));
+        setUsers(mappedUsers);
+      }
+    } catch (error) {
+      console.error("Failed to load users:", error);
+      setToastMessage("Failed to load users");
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -226,46 +205,50 @@ const UserManagement: React.FC = () => {
     return true;
   };
 
-  const saveUser = () => {
+  const saveUser = async () => {
     if (!validateUser()) return;
 
-    if (editingUser) {
-      // Update existing user
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id === editingUser
-            ? {
-                ...user,
-                name: userForm.name,
-                email: userForm.email,
-                role: userForm.role,
-                isActive: userForm.isActive,
-                department: userForm.department,
-              }
-            : user,
-        ),
-      );
-      setToastMessage("User updated successfully");
-    } else {
-      // Create new user
-      const newUser = {
-        id: Date.now().toString(),
-        name: userForm.name,
-        email: userForm.email,
-        role: userForm.role,
-        isActive: userForm.isActive,
-        department: userForm.department,
-        joinDate: new Date().toISOString().split("T")[0],
-        lastLogin: undefined,
-      };
-      setUsers((prev) => [...prev, newUser]);
-      setToastMessage("User created successfully");
+    try {
+      if (editingUser) {
+        const response = await usersAPI.updateUser(editingUser, {
+          name: userForm.name,
+          email: userForm.email,
+          role: userForm.role,
+          isActive: userForm.isActive,
+          department: userForm.department,
+        });
+        if (response.success) {
+          setToastMessage("User updated successfully");
+          await loadUsers();
+        } else {
+          setToastMessage(response.message || "Failed to update user");
+        }
+      } else {
+        // For new user creation, a password is required
+        const tempPassword = Math.random().toString(36).slice(-8) + "A1!";
+        const response = await usersAPI.createUser({
+          name: userForm.name,
+          email: userForm.email,
+          password: tempPassword,
+          role: userForm.role,
+          department: userForm.department,
+        });
+        if (response.success) {
+          setToastMessage("User created successfully (temp password sent via email)");
+          await loadUsers();
+        } else {
+          setToastMessage(response.message || "Failed to create user");
+        }
+      }
+    } catch (error: any) {
+      setToastMessage(error.response?.data?.message || error.message || "Operation failed");
     }
 
     resetForm();
     setShowUserModal(false);
     setShowToast(true);
   };
+
 
   const editUser = (user: any) => {
     setUserForm({
@@ -281,40 +264,66 @@ const UserManagement: React.FC = () => {
     setShowUserModal(true);
   };
 
-  const deleteUser = () => {
+  const deleteUser = async () => {
     if (selectedUser) {
-      setUsers((prev) => prev.filter((user) => user.id !== selectedUser));
-      setToastMessage("User deleted successfully");
+      try {
+        const response = await usersAPI.deleteUser(selectedUser);
+        if (response.success) {
+          setToastMessage("User deleted successfully");
+          await loadUsers();
+        } else {
+          setToastMessage(response.message || "Failed to delete user");
+        }
+      } catch (error: any) {
+        setToastMessage(error.response?.data?.message || "Failed to delete user");
+      }
       setShowToast(true);
       setSelectedUser(null);
       setShowDeleteAlert(false);
     }
   };
 
-  const toggleUserStatus = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === userId ? { ...user, isActive: !user.isActive } : user,
-      ),
-    );
-    setToastMessage("User status updated");
+
+  const toggleUserStatus = async (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    if (!user) return;
+    try {
+      const response = await usersAPI.updateUser(userId, { isActive: !user.isActive });
+      if (response.success) {
+        await loadUsers();
+        setToastMessage("User status updated");
+      } else {
+        setToastMessage(response.message || "Failed to update status");
+      }
+    } catch (error: any) {
+      setToastMessage(error.response?.data?.message || "Failed to update status");
+    }
     setShowToast(true);
   };
 
-  const viewUserStats = (userId: string) => {
-    // Mock stats data
-    const mockStats: UserStats = {
-      totalExams: 12,
-      averageScore: 85.6,
-      lastActivity: "2024-01-15T10:30:00Z",
-      examsPassed: 10,
-      examsFailed: 2,
-    };
 
-    setUserStats(mockStats);
+  const viewUserStats = async (userId: string) => {
+    try {
+      const response = await usersAPI.getUserStats(userId);
+      if (response.success && response.data) {
+        const data = response.data;
+        setUserStats({
+          totalExams: data.totalExams || 0,
+          averageScore: data.averageScore || 0,
+          lastActivity: data.lastExamDate ? new Date(data.lastExamDate).toISOString() : new Date().toISOString(),
+          examsPassed: data.examsPassed || 0,
+          examsFailed: data.examsFailed || 0,
+        });
+      } else {
+        setUserStats({ totalExams: 0, averageScore: 0, lastActivity: new Date().toISOString(), examsPassed: 0, examsFailed: 0 });
+      }
+    } catch {
+      setUserStats({ totalExams: 0, averageScore: 0, lastActivity: new Date().toISOString(), examsPassed: 0, examsFailed: 0 });
+    }
     setSelectedUser(userId);
     setShowStatsModal(true);
   };
+
 
   const resetForm = () => {
     setUserForm({
@@ -329,11 +338,24 @@ const UserManagement: React.FC = () => {
     setEditingUser(null);
   };
 
-  const exportUsers = () => {
-    // Mock export functionality
-    setToastMessage("Users exported successfully");
+  const exportUsers = async () => {
+    try {
+      // Export all current users as JSON download
+      const data = JSON.stringify(users, null, 2);
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `users-export-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setToastMessage("Users exported successfully");
+    } catch {
+      setToastMessage("Export failed");
+    }
     setShowToast(true);
   };
+
 
   const getRoleColor = (role: string) => {
     switch (role) {

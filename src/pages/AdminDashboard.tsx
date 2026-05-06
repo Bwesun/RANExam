@@ -48,6 +48,7 @@ import {
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   IonActionSheet,
+  IonSpinner,
 } from "@ionic/react";
 import {
   addOutline,
@@ -88,7 +89,9 @@ import {
   phonePortraitOutline,
 } from "ionicons/icons";
 import { User } from "../types/exam";
+import { usersAPI, adminAPI } from "../services/api";
 import "./AdminDashboard.css";
+
 
 interface ExtendedUser extends User {
   isActive: boolean;
@@ -182,117 +185,62 @@ const AdminDashboard: React.FC = () => {
     "system_settings",
   ];
 
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     loadUsers();
+    loadDashboardStats();
   }, []);
 
-  const loadUsers = () => {
-    // Enhanced mock user data with comprehensive information
-    const mockUsers: ExtendedUser[] = [
-      {
-        id: "1",
-        name: "John Doe",
-        email: "john.doe@example.com",
-        role: "student",
-        isActive: true,
-        department: "Computer Science",
-        joinDate: "2023-09-15",
-        lastLogin: "2024-01-15T10:30:00Z",
-        examsTaken: 8,
-        averageScore: 85.5,
-        permissions: [],
-        phoneNumber: "+1234567890",
-        address: "123 Main St, City, State",
-        emergencyContact: "Jane Doe - +1234567891",
-        lastExamDate: "2024-01-10",
-        totalLoginTime: 2400,
-        notes: "Excellent performance in programming courses",
-      },
-      {
-        id: "2",
-        name: "Jane Smith",
-        email: "jane.smith@example.com",
-        role: "instructor",
-        isActive: true,
-        department: "Software Engineering",
-        joinDate: "2022-08-20",
-        lastLogin: "2024-01-14T15:45:00Z",
-        examsTaken: 0,
-        averageScore: 0,
-        permissions: ["create_exam", "edit_exam", "view_results"],
-        phoneNumber: "+1234567892",
-        address: "456 Oak Ave, City, State",
-        emergencyContact: "John Smith - +1234567893",
-        totalLoginTime: 15600,
-        notes: "Senior instructor with 5+ years experience",
-      },
-      {
-        id: "3",
-        name: "Mike Johnson",
-        email: "mike.johnson@example.com",
-        role: "student",
-        isActive: false,
-        department: "Information Technology",
-        joinDate: "2023-10-05",
-        lastLogin: "2023-12-20T09:15:00Z",
-        examsTaken: 3,
-        averageScore: 72.3,
-        permissions: [],
-        phoneNumber: "+1234567894",
-        address: "789 Pine St, City, State",
-        emergencyContact: "Sarah Johnson - +1234567895",
-        lastExamDate: "2023-12-15",
-        totalLoginTime: 800,
-        notes: "Account suspended due to policy violation",
-      },
-      {
-        id: "4",
-        name: "Sarah Wilson",
-        email: "sarah.wilson@example.com",
-        role: "admin",
-        isActive: true,
-        department: "Administration",
-        joinDate: "2021-03-10",
-        lastLogin: "2024-01-15T08:20:00Z",
-        examsTaken: 0,
-        averageScore: 0,
-        permissions: [
-          "manage_users",
-          "system_settings",
-          "export_data",
-          "create_exam",
-          "edit_exam",
-          "delete_exam",
-          "view_results",
-        ],
-        phoneNumber: "+1234567896",
-        address: "321 Elm Dr, City, State",
-        emergencyContact: "Robert Wilson - +1234567897",
-        totalLoginTime: 28800,
-        notes: "System administrator and platform manager",
-      },
-      {
-        id: "5",
-        name: "David Brown",
-        email: "david.brown@example.com",
-        role: "instructor",
-        isActive: true,
-        department: "Database Systems",
-        joinDate: "2022-01-15",
-        lastLogin: "2024-01-13T14:10:00Z",
-        examsTaken: 0,
-        averageScore: 0,
-        permissions: ["create_exam", "edit_exam", "view_results"],
-        phoneNumber: "+1234567898",
-        address: "654 Maple Ln, City, State",
-        emergencyContact: "Lisa Brown - +1234567899",
-        totalLoginTime: 12000,
-        notes: "Database specialist and course coordinator",
-      },
-    ];
-
-    setUsers(mockUsers);
+  const loadDashboardStats = async () => {
+    try {
+      const response = await adminAPI.getDashboardStats();
+      if (response.success && response.data) {
+        setDashboardStats(response.data.overview || response.data);
+      }
+    } catch (error) {
+      console.error("Failed to load dashboard stats:", error);
+    }
   };
+
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const response = await usersAPI.getUsers({ limit: 100 });
+      if (response.success && response.data) {
+        const rawData = response.data;
+        const userList = Array.isArray(rawData) ? rawData : (rawData.data ?? []);
+        // Map backend _id to id for consistency
+        const mappedUsers: ExtendedUser[] = userList.map((u: any) => ({
+          id: u._id || u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          isActive: u.isActive,
+          department: u.department,
+          joinDate: u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : '',
+          lastLogin: u.lastLogin,
+          examsTaken: u.examStats?.totalExams || 0,
+          averageScore: u.examStats?.averageScore || 0,
+          permissions: u.permissions || [],
+          phoneNumber: u.phoneNumber,
+          address: u.address,
+          emergencyContact: u.emergencyContact,
+          profileImage: u.profileImage,
+          notes: u.notes,
+        }));
+        setUsers(mappedUsers);
+      }
+    } catch (error) {
+      console.error("Failed to load users:", error);
+      setToastMessage("Failed to load users");
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const filteredAndSortedUsers = users
     .filter((user) => {
@@ -397,47 +345,67 @@ const AdminDashboard: React.FC = () => {
     return true;
   };
 
-  const saveUser = () => {
+  const saveUser = async () => {
     if (!validateUser()) return;
 
-    if (editingUser) {
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id === editingUser
-            ? {
-                ...user,
-                name: userForm.name,
-                email: userForm.email,
-                role: userForm.role,
-                isActive: userForm.isActive,
-                department: userForm.department,
-                phoneNumber: userForm.phoneNumber,
-                address: userForm.address,
-                emergencyContact: userForm.emergencyContact,
-                permissions: userForm.permissions,
-                notes: userForm.notes,
-              }
-            : user,
-        ),
-      );
-      setToastMessage("User updated successfully");
-    } else {
-      const newUser: ExtendedUser = {
-        ...userForm,
-        id: Date.now().toString(),
-        joinDate: new Date().toISOString().split("T")[0],
-        examsTaken: 0,
-        averageScore: 0,
-        totalLoginTime: 0,
-      };
-      setUsers((prev) => [...prev, newUser]);
-      setToastMessage("User created successfully");
+    try {
+      if (editingUser) {
+        // Update existing user via API
+        const updateData: any = {
+          name: userForm.name,
+          email: userForm.email,
+          role: userForm.role,
+          isActive: userForm.isActive,
+          department: userForm.department,
+          phoneNumber: userForm.phoneNumber,
+          address: userForm.address,
+          emergencyContact: userForm.emergencyContact,
+          permissions: userForm.permissions,
+          notes: userForm.notes,
+        };
+        const response = await usersAPI.updateUser(editingUser, updateData);
+        if (response.success) {
+          setToastMessage("User updated successfully");
+          await loadUsers();
+        } else {
+          setToastMessage(response.message || "Failed to update user");
+        }
+      } else {
+        // Create new user via API
+        if (!userForm.password) {
+          setToastMessage("Password is required for new users");
+          setShowToast(true);
+          return;
+        }
+        const response = await usersAPI.createUser({
+          name: userForm.name,
+          email: userForm.email,
+          password: userForm.password,
+          role: userForm.role,
+          department: userForm.department,
+          phoneNumber: userForm.phoneNumber,
+          address: userForm.address,
+          emergencyContact: userForm.emergencyContact,
+          permissions: userForm.permissions,
+          notes: userForm.notes,
+        });
+        if (response.success) {
+          setToastMessage("User created successfully");
+          await loadUsers();
+        } else {
+          setToastMessage(response.message || "Failed to create user");
+        }
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || "Operation failed";
+      setToastMessage(message);
     }
 
     resetForm();
     setShowUserModal(false);
     setShowToast(true);
   };
+
 
   const editUser = (user: ExtendedUser) => {
     setUserForm({
@@ -449,63 +417,72 @@ const AdminDashboard: React.FC = () => {
     setShowUserModal(true);
   };
 
-  const deleteUser = () => {
+  const deleteUser = async () => {
     if (selectedUser) {
-      setUsers((prev) => prev.filter((user) => user.id !== selectedUser.id));
-      setToastMessage("User deleted successfully");
+      try {
+        const response = await usersAPI.deleteUser(selectedUser.id);
+        if (response.success) {
+          setToastMessage("User deleted successfully");
+          await loadUsers();
+        } else {
+          setToastMessage(response.message || "Failed to delete user");
+        }
+      } catch (error: any) {
+        setToastMessage(error.response?.data?.message || "Failed to delete user");
+      }
       setShowToast(true);
       setSelectedUser(null);
       setShowDeleteAlert(false);
     }
   };
 
-  const toggleUserStatus = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === userId ? { ...user, isActive: !user.isActive } : user,
-      ),
-    );
-    setToastMessage("User status updated");
+
+  const toggleUserStatus = async (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    if (!user) return;
+    try {
+      const response = await usersAPI.updateUser(userId, { isActive: !user.isActive });
+      if (response.success) {
+        await loadUsers();
+        setToastMessage("User status updated");
+      } else {
+        setToastMessage(response.message || "Failed to update status");
+      }
+    } catch (error: any) {
+      setToastMessage(error.response?.data?.message || "Failed to update status");
+    }
     setShowToast(true);
   };
 
-  const handleBulkAction = (action: string) => {
-    switch (action) {
-      case "activate":
-        setUsers((prev) =>
-          prev.map((user) =>
-            selectedUsers.includes(user.id)
-              ? { ...user, isActive: true }
-              : user,
-          ),
-        );
-        setToastMessage(`${selectedUsers.length} users activated`);
-        break;
-      case "deactivate":
-        setUsers((prev) =>
-          prev.map((user) =>
-            selectedUsers.includes(user.id)
-              ? { ...user, isActive: false }
-              : user,
-          ),
-        );
-        setToastMessage(`${selectedUsers.length} users deactivated`);
-        break;
-      case "delete":
-        setUsers((prev) =>
-          prev.filter((user) => !selectedUsers.includes(user.id)),
-        );
-        setToastMessage(`${selectedUsers.length} users deleted`);
-        break;
-      case "export":
+
+  const handleBulkAction = async (action: string) => {
+    if (selectedUsers.length === 0) return;
+
+    try {
+      if (action === "export") {
         exportSelectedUsers();
-        break;
+        return;
+      }
+
+      if (action === "activate" || action === "deactivate" || action === "delete") {
+        const apiAction = action as "activate" | "deactivate" | "delete";
+        const response = await usersAPI.bulkUserAction(apiAction, selectedUsers);
+        if (response.success) {
+          setToastMessage(`${selectedUsers.length} users ${action}d successfully`);
+          await loadUsers();
+        } else {
+          setToastMessage(response.message || `Failed to ${action} users`);
+        }
+      }
+    } catch (error: any) {
+      setToastMessage(error.response?.data?.message || `Failed to perform ${action}`);
     }
 
     setSelectedUsers([]);
     setIsSelectionMode(false);
     setShowToast(true);
   };
+
 
   const toggleUserSelection = (userId: string) => {
     setSelectedUsers((prev) =>
@@ -523,14 +500,23 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const exportSelectedUsers = () => {
-    const selectedUserData = users.filter((user) =>
-      selectedUsers.includes(user.id),
-    );
-    // Mock export functionality
-    console.log("Exporting users:", selectedUserData);
-    setToastMessage("Users exported successfully");
+  const exportSelectedUsers = async () => {
+    try {
+      const blob = await adminAPI.exportData("users");
+      // Trigger download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `users-export-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setToastMessage("Users exported successfully");
+    } catch {
+      setToastMessage("Export failed");
+    }
+    setShowToast(true);
   };
+
 
   const resetForm = () => {
     setUserForm({
@@ -553,11 +539,16 @@ const AdminDashboard: React.FC = () => {
     setEditingUser(null);
   };
 
-  const resetPassword = (userId: string) => {
-    // Mock reset password functionality
-    setToastMessage("Password reset email sent");
+  const resetPassword = async (userId: string) => {
+    try {
+      const response = await usersAPI.resetUserPassword(userId);
+      setToastMessage(response.success ? "Password reset email sent" : (response.message || "Failed to reset password"));
+    } catch (error: any) {
+      setToastMessage(error.response?.data?.message || "Failed to reset password");
+    }
     setShowToast(true);
   };
+
 
   const sendNotification = (userId: string) => {
     // Mock notification functionality
@@ -661,9 +652,10 @@ const AdminDashboard: React.FC = () => {
                     <div className="summary-content">
                       <IonIcon icon={personOutline} className="summary-icon" />
                       <div className="summary-text">
-                        <h3>{users.length}</h3>
+                        <h3>{dashboardStats?.totalUsers ?? users.length}</h3>
                         <p>Total Users</p>
-                        <IonNote color="medium">+12 this month</IonNote>
+                        <IonNote color="medium">{dashboardStats?.totalExams ?? 0} exams total</IonNote>
+
                       </div>
                     </div>
                   </IonCardContent>
@@ -678,9 +670,10 @@ const AdminDashboard: React.FC = () => {
                         className="summary-icon"
                       />
                       <div className="summary-text">
-                        <h3>{users.filter((u) => u.isActive).length}</h3>
+                        <h3>{dashboardStats?.activeUsers ?? users.filter((u) => u.isActive).length}</h3>
                         <p>Active Users</p>
-                        <IonNote color="success">98% active rate</IonNote>
+                        <IonNote color="success">{dashboardStats?.completedAttempts ?? 0} attempts done</IonNote>
+
                       </div>
                     </div>
                   </IonCardContent>
@@ -693,10 +686,11 @@ const AdminDashboard: React.FC = () => {
                       <IonIcon icon={schoolOutline} className="summary-icon" />
                       <div className="summary-text">
                         <h3>
-                          {users.filter((u) => u.role === "student").length}
+                          {dashboardStats?.totalStudents ?? users.filter((u) => u.role === "student").length}
                         </h3>
                         <p>Students</p>
-                        <IonNote color="primary">85% pass rate</IonNote>
+                        <IonNote color="primary">{dashboardStats?.passRate ? `${dashboardStats.passRate}% pass rate` : '—'}</IonNote>
+
                       </div>
                     </div>
                   </IonCardContent>
@@ -712,10 +706,11 @@ const AdminDashboard: React.FC = () => {
                       />
                       <div className="summary-text">
                         <h3>
-                          {users.filter((u) => u.role === "instructor").length}
+                          {dashboardStats?.totalInstructors ?? users.filter((u) => u.role === "instructor").length}
                         </h3>
                         <p>Instructors</p>
-                        <IonNote color="warning">4.8 avg rating</IonNote>
+                        <IonNote color="warning">{dashboardStats?.totalAdmins ?? users.filter((u) => u.role === "admin").length} admins</IonNote>
+
                       </div>
                     </div>
                   </IonCardContent>

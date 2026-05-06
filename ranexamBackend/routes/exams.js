@@ -37,6 +37,7 @@ router.get(
       .withMessage("Invalid status"),
     query("isActive")
       .optional()
+      .toBoolean()
       .isBoolean()
       .withMessage("isActive must be boolean"),
   ],
